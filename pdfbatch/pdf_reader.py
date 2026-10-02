@@ -24,8 +24,12 @@ class PdfContent:
     xmp: str                           # raw XMP packet ('' if none)
     page_texts: List[str]              # text of every page
     header_footer_text: str            # page-1 text in top/bottom 12% bands + left/right margins
-    title_guess: Optional[str]         # largest-font text on page 1
+    title_guesses: List[str]           # large-font text runs on page 1, largest first
     link_uris: List[str] = field(default_factory=list)   # http(s) link annotations
+
+    @property
+    def title_guess(self) -> Optional[str]:
+        return self.title_guesses[0] if self.title_guesses else None
 
     @property
     def first_pages(self) -> str:
@@ -71,7 +75,7 @@ def read_pdf(path: Path) -> PdfContent:
             xmp = ""
         page_texts = [p.get_text("text") for p in doc]
         hf = _header_footer_text(doc[0]) if doc.page_count else ""
-        title = _title_guess(doc[0]) if doc.page_count else None
+        titles = _title_guesses(doc[0]) if doc.page_count else []
         uris = [u for page in doc for ln in page.get_links()
                 if (u := ln.get("uri") or "").startswith(("http://", "https://"))]
         return PdfContent(
@@ -81,7 +85,7 @@ def read_pdf(path: Path) -> PdfContent:
             xmp=xmp,
             page_texts=page_texts,
             header_footer_text=hf,
-            title_guess=title,
+            title_guesses=titles,
             link_uris=uris,
         )
     finally:
@@ -108,11 +112,12 @@ _TITLE_JUNK = re.compile(
 )
 
 
-def _title_guess(page) -> Optional[str]:
-    """Join the lines set in the largest font in the top 60% of page 1.
+def _title_guesses(page) -> List[str]:
+    """Runs of lines set in the three largest fonts in the top 60% of page 1, largest first.
 
-    Cheap and surprisingly reliable for journal PDFs; GROBID or the LLM tier
-    handle the cases where it isn't.
+    Usually the first is the title. Not always: a series banner ("… Working Paper
+    Series") can be set larger, so later runs are kept too and the title search
+    tries each in turn; validation rejects the wrong ones.
     """
     d = page.get_text("dict")
     limit_y = page.rect.y0 + page.rect.height * 0.6
@@ -128,8 +133,7 @@ def _title_guess(page) -> Optional[str]:
             size = max(s["size"] for s in spans)
             text = " ".join(s["text"].strip() for s in spans)
             lines.append((round(size, 1), y0, text))
-    if not lines:
-        return None
+    guesses = []
     for size in sorted({l[0] for l in lines}, reverse=True)[:3]:
         cand = [l for l in lines if abs(l[0] - size) < 0.6]
         cand.sort(key=lambda l: l[1])
@@ -144,8 +148,8 @@ def _title_guess(page) -> Optional[str]:
         text = re.sub(r"\s+", " ", text).strip()
         text = re.sub(r"-\s(?=[a-z])", "", text)    # de-hyphenate line breaks
         if 15 <= len(text) <= 350 and not _TITLE_JUNK.match(text) and re.search(r"[a-z]", text):
-            return text
-    return None
+            guesses.append(text)
+    return guesses
 
 
 def abstract_from_text(text: str) -> Optional[str]:

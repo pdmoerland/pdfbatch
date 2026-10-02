@@ -245,6 +245,9 @@ def openalex_to_fields(w: dict) -> dict:
     pmid = (ids.get("pmid") or "").rsplit("/", 1)[-1] or None
     pmcid = (ids.get("pmcid") or "").rsplit("/", 1)[-1] or None
     date = w.get("publication_date")
+    first, last = bib.get("first_page"), bib.get("last_page")
+    # OpenAlex puts article numbers in the page fields: first = last = "Article5".
+    article = re.fullmatch(r"article\s*(?:no\.?\s*)?(\S+)", first or "", re.I)
     return {
         "title": w.get("title") or w.get("display_name"),
         "authors": [a for a in authors if a.family or a.literal],
@@ -254,8 +257,9 @@ def openalex_to_fields(w: dict) -> dict:
         "year": date[:4] if date else None,
         "volume": bib.get("volume"),
         "issue": bib.get("issue"),
-        "first_page": bib.get("first_page"),
-        "last_page": bib.get("last_page"),
+        "first_page": None if article else first,
+        "last_page": None if article or last == first else last,
+        "article_number": article and article[1],
         "doi": (w.get("doi") or "").replace("https://doi.org/", "").lower() or None,
         "abstract": _inverted_to_text(w.get("abstract_inverted_index")),
         "pmid": pmid,

@@ -154,7 +154,7 @@ def _best_candidate(http: apis.Http, s: Settings, pdf: PdfContent) -> Optional[H
 
 def _fallbacks(http: apis.Http, s: Settings, pdf: PdfContent) -> Iterator[Hit]:
     """Tiers 3–5, cheapest first; generated lazily so later tiers run only when needed."""
-    for title in dict.fromkeys(t for t in (pdf.title_guess, pdf.info.get("title")) if t and len(t) >= 15):
+    for title in dict.fromkeys(t for t in (*pdf.title_guesses, pdf.info.get("title")) if t and len(t) >= 15):
         yield (*_title_search(http, s, pdf, title), "title-search")
     if s.grobid_url and (g := _grobid(s, pdf.path)):
         f, conf, by = _lookup(http, s, pdf, g["doi"], g["title"])

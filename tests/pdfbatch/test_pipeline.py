@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pymupdf
 import pytest
 
 from pdfbatch import apis
@@ -62,6 +63,21 @@ def test_author_split():
 def test_apa_authors():
     r = Record(authors=[Author("Doe", "Jane Q."), Author(literal="Human Cell Atlas Consortium")], year="2024")
     assert apa(r) == "Doe, J. Q., & Human Cell Atlas Consortium (2024)."
+
+
+@pytest.mark.parametrize("first, last, want", [
+    ("Article5", "Article5", (None, None, "5")),         # OpenAlex's way of giving an article number
+    ("e1001", "e1001", ("e1001", None, None)),
+    ("1012", "1024", ("1012", "1024", None)),
+])
+def test_openalex_pages(first, last, want):
+    f = apis.openalex_to_fields({"biblio": {"first_page": first, "last_page": last}})
+    assert (f["first_page"], f["last_page"], f["article_number"]) == want
+
+
+def test_apa_article_number():
+    r = Record(title="T", year="2003", journal="J", volume="2", issue="1", article_number="5")
+    assert apa(r) == "T. (2003). *J*, *2*(1), Article 5."
 
 
 @pytest.mark.parametrize("url, want", [
@@ -130,6 +146,18 @@ def test_title_search_without_doi(pdf_dir, http):
     assert r.doi == "10.1105/tpc.23.00001"
     assert r.confidence == "high" and r.resolved_via[0] == "title-search"
     assert r.oa.status == "closed" and r.oa.is_oa is False
+
+
+def test_title_below_a_larger_banner(tmp_path, http):
+    # Working papers often set the series name larger than the title.
+    doc = pymupdf.open()
+    fixtures._page(doc, [(50, 60, "Working Paper Series in Plant Biology", 24),
+                         (50, 110, "Phase separation of transcription factors", 19),
+                         (50, 135, "in plant immunity", 19),
+                         (50, 170, "Anna Jansen and Bram de Vries", 11)])
+    doc.save(tmp_path / "working_paper.pdf"); doc.close()
+    r = process_pdf(tmp_path / "working_paper.pdf", http, settings())
+    assert r.doi == "10.1105/tpc.23.00001" and r.confidence == "high"
 
 
 def test_title_search_falls_back_to_openalex(pdf_dir, http, monkeypatch):

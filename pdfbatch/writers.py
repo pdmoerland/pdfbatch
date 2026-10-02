@@ -80,7 +80,7 @@ def apa(r: Record) -> str:
         if r.first_page:
             source += f", {r.first_page}" + (f"–{r.last_page}" if r.last_page else "")
         elif r.article_number:
-            source += f", {r.article_number}"
+            source += f", Article {r.article_number}"
         source += "."
     who = _apa_authors(r.authors)
     year = f"({r.year})." if r.year else "(n.d.)."
