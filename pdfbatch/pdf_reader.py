@@ -5,14 +5,13 @@ Nothing here touches the network or an LLM.
 
 from __future__ import annotations
 
-import functools
 import hashlib
 import os
 import re
 import threading
 import unicodedata
 from dataclasses import dataclass, field
-from functools import cached_property
+from functools import cache, cached_property
 from pathlib import Path
 from typing import List, Optional
 
@@ -142,7 +141,7 @@ _TESSDATA_DIRS = (
 _OCR_LOCK = threading.Lock()
 
 
-@functools.cache
+@cache
 def _tessdata() -> Optional[str]:
     try:
         return pymupdf.get_tessdata()          # TESSDATA_PREFIX, or a tesseract on PATH
@@ -193,40 +192,26 @@ def _title_guesses(tp, rect) -> List[str]:
     Series") can be set larger, so later runs are kept too and the title search
     tries each in turn; validation rejects the wrong ones.
     """
-    d = tp.extractDICT()
-    limit_y = rect.y0 + rect.height * 0.6
-    lines = []  # (size, y0, text)
-    for block in d.get("blocks", []):
-        for line in block.get("lines", []):
-            spans = [s for s in line.get("spans", []) if s.get("text", "").strip()]
-            if not spans:
-                continue
-            y0 = line["bbox"][1]
-            if y0 > limit_y:
-                continue
+    lines = []                                 # (size, y, text) for lines in the top 60% of the page
+    for line in (l for b in tp.extractDICT().get("blocks", []) for l in b.get("lines", [])):
+        spans = [s for s in line["spans"] if s["text"].strip()]
+        if spans and line["bbox"][1] <= rect.y0 + rect.height * 0.6:
             size = max(s["size"] for s in spans)
             # Leave out superscripts (footnote markers, affiliation numbers): "Microarray¹" is not
             # titled "Microarray 1", and the stray digit alone can make a title search miss.
             text = " ".join(s["text"].strip() for s in spans if s["size"] >= 0.7 * size)
-            lines.append((round(size, 1), y0, text))
+            lines.append((round(size, 1), line["bbox"][1], text))
     guesses = []
-    for size in sorted({l[0] for l in lines}, reverse=True)[:3]:
-        cand = [l for l in lines if abs(l[0] - size) < 0.6]
-        cand.sort(key=lambda l: l[1])
-        # Keep the first vertically contiguous run of lines at this size.
-        run = [cand[0]]
-        for l in cand[1:]:
-            if l[1] - run[-1][1] <= size * 2.2:
-                run.append(l)
-            else:
+    for size in sorted({s for s, _, _ in lines}, reverse=True)[:3]:
+        run = []                               # the first vertically contiguous run at this size
+        for _, y, t in sorted((l for l in lines if abs(l[0] - size) < 0.6), key=lambda l: l[1]):
+            if run and y - run[-1][0] > size * 2.2:
                 break
-        text = " ".join(t for _, _, t in run)
-        text = re.sub(r"\s+", " ", text).strip()
-        text = re.sub(r"-\s(?=[a-z])", "", text)    # de-hyphenate line breaks
+            run.append((y, t))
+        text = re.sub(r"-\s(?=[a-z])", "", " ".join(" ".join(t for _, t in run).split()))  # de-hyphenate
         # Three real words rather than "has lower case": theses and older papers set titles in
         # capitals, while short banners ("NATURE GENETICS", letter-spaced "A R T I C L E S") are not titles.
-        words = sum(len(w) > 1 for w in text.split())
-        if 15 <= len(text) <= 350 and not _TITLE_JUNK.match(text) and words >= 3:
+        if 15 <= len(text) <= 350 and not _TITLE_JUNK.match(text) and sum(len(w) > 1 for w in text.split()) >= 3:
             guesses.append(text)
     return guesses
 

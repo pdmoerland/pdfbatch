@@ -196,8 +196,7 @@ def write_markdown(records: List[Record], path: Path, *, llm_usage: str = "") ->
            + (f" {llm_usage}" if llm_usage else ""), ""]
     if review:
         out += ["## Needs review", ""]
-        out += [f"- `{Path(r.pdf_path).name}` — {r.confidence}: {'; '.join(r.notes) or 'weak match'}"
-                for r in review]
+        out += [f"- `{Path(r.pdf_path).name}` — {'; '.join(r.notes)}" for r in review]
         out.append("")
     out += ["## Papers", ""]
     for r in recs:

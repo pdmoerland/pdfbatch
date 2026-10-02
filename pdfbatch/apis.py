@@ -167,34 +167,20 @@ def crossref_to_fields(m: dict) -> dict:
             authors.append(Author(family=a["family"].strip(), given=(a.get("given") or "").strip()))
         elif a.get("name"):
             authors.append(Author(literal=a["name"].strip()))
-    date = None
-    for k in ("published-print", "published-online", "issued", "published", "posted", "created"):
-        date = _date_from_parts(m.get(k))
-        if date:
-            break
+    date = next(filter(None, (_date_from_parts(m.get(k)) for k in
+                              ("published-print", "published-online", "issued", "published", "posted", "created"))), None)
     ctype = m.get("type") or "journal-article"
     is_preprint = ctype == "posted-content" and (m.get("subtype") in (None, "preprint"))
     journal = (m.get("container-title") or [None])[0]
     if is_preprint and not journal:
         journal = (m.get("institution") or [{}])[0].get("name") or m.get("publisher")
-    rel = m.get("relation") or {}
-    related_doi = related_rel = None
-    for r in ("is-preprint-of", "has-preprint"):
-        for item in rel.get(r) or []:
-            if item.get("id-type") == "doi":
-                related_doi, related_rel = item["id"].lower(), r
-                break
-        if related_doi:
-            break
-    issn = None
-    for t in m.get("issn-type") or []:
-        if t.get("type") == "print":
-            issn = t["value"]
-    issn = issn or (m.get("ISSN") or [None])[0]
-    lic = None
-    for l in m.get("license") or []:
-        if l.get("content-version") in ("vor", "unspecified"):
-            lic = _norm_license(l.get("URL"))
+    related_doi, related_rel = next(((item["id"].lower(), r) for r in ("is-preprint-of", "has-preprint")
+                                     for item in (m.get("relation") or {}).get(r) or []
+                                     if item.get("id-type") == "doi"), (None, None))
+    issn = next((t["value"] for t in m.get("issn-type") or [] if t.get("type") == "print"),
+                (m.get("ISSN") or [None])[0])
+    lic = next((_norm_license(l.get("URL")) for l in m.get("license") or []
+                if l.get("content-version") in ("vor", "unspecified")), None)
     return {
         "item_type": "preprint" if is_preprint else ctype,
         "is_preprint": is_preprint,

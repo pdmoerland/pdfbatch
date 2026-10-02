@@ -83,18 +83,18 @@ Every API hit is checked against the PDF text before it is accepted (`validate`)
 
 | Confidence | Rule |
 |---|---|
-| `high` | title ≥ 90 **and** an author found |
-| `medium` | title ≥ 90, **or** title ≥ 75 and an author found |
-| `low` | anything else |
-| `unresolved` | no API record at all; PDF-derived title and Info-dict authors only |
+| `high` | title ≥ 90 **and** the authors found |
+| `medium` | title ≥ 75 **and** the authors found |
+| `unresolved` | nothing confirmed; PDF-derived title and Info-dict authors only |
+
+**Specificity over sensitivity.** A title alone never confirms a match: a record is applied only when the PDF shows its title *and* its authors. An API hit that falls short is not used at all, not even as a flagged guess. A PDF left unresolved costs a minute by hand; a wrong record imported into your library may never be noticed.
 
 **How the result is used:**
-- **Accepted:** `medium` and above.
-- **Low-confidence fallback:** if nothing better turns up, a `low` hit is kept, with a note saying so.
-- **Review flag:** `low` and `unresolved` records are listed under "Needs review" in Markdown and tagged `pdfbatch: needs review` in RIS, so you can filter them in your reference manager.
+- **Accepted:** `high` and `medium`.
+- **Review flag:** `unresolved` records are listed under "Needs review" in Markdown and tagged `pdfbatch: needs review` in RIS, so you can filter them in your reference manager.
 - **Title-search guard:** search hits must also resemble the query (`token_set_ratio` ≥ 85) and must not be a mere fragment of it: the hit's title needs at least 60% of the query's length. Otherwise an encyclopedia entry named after a method in the title ("Surface-Enhanced Laser Desorption/Ionization…") shares the words without being the paper. A *longer* hit is fine, because OCR'd queries can be fragments themselves.
-- **Search hits need all their authors:** a hit from a title search is accepted only if *every* author's family name is found in the PDF. A record without authors can't pass. A generic title ("Model Assessment and Selection") belongs to many works, such as a slide deck and a textbook chapter. A DOI printed in the PDF is evidence in itself, so DOI hits can still reach `medium` on the title alone.
-- **Short titles prove nothing:** an API title of fewer than three words ("32", "NCI & FDA") occurs in almost any text, so it can never validate a match; it gives `low` at most.
+- **"The authors":** for a DOI or arXiv ID found in the PDF, at least one of the first five authors, because the identifier is evidence in itself. For a title-search hit, *every* author: a generic title ("Model Assessment and Selection") belongs to many works, such as a slide deck and a textbook chapter. A record without authors can never pass.
+- **Short titles prove nothing:** an API title of fewer than three words ("32", "NCI & FDA") occurs in almost any text, so it never validates a match.
 - **Garbled text is no text:** a page 1 whose text is more than 1% control characters comes from a font without a character map (common in older LaTeX PDFs). It is OCR'd like a scan.
 - **Last query, the opening lines:** after the font-based title guesses and the Info title, the first two substantial lines of page 1 are searched. In reading order the title usually comes first, and this rescues PDFs whose font sizes mislead, OCR output in particular.
 
@@ -250,7 +250,7 @@ Five runtime dependencies: `requests`, `diskcache`, `python-dotenv`, `pymupdf` a
 
 ## Code shape
 
-The package has ten modules, about 1,800 lines, and one data flow:
+The package has ten modules, about 1,900 lines, and one data flow:
 
 ```
 cli ──► pipeline.process_pdf ──► pdf_reader.read_pdf
@@ -277,4 +277,5 @@ Principles applied in [iteration 4](docs/plans/2026-10-02-refactor-minimal-elega
 | 2 | [Standalone tool](docs/plans/2026-10-02-refactor-standalone-pdfbatch-plan.md) | `ec51861` |
 | 3 | [Leaner Markdown output](docs/plans/2026-10-02-feat-simplify-markdown-output-plan.md) | `844ac08`, `3d9e172` |
 | 4 | [Minimal, elegant code](docs/plans/2026-10-02-refactor-minimal-elegant-code-plan.md) | `df2dcc4` |
-| 5 | [Harder PDFs: review records, banners, scans](docs/plans/2026-10-02-fix-harder-pdfs-plan.md) | `75f8ef1`, `84f9cba`, then the OCR-fallback commit |
+| 5 | [Harder PDFs: review records, banners, scans](docs/plans/2026-10-02-fix-harder-pdfs-plan.md) | `75f8ef1` … `a17cf74` |
+| 6 | [Specificity over sensitivity](docs/plans/2026-10-02-refactor-specificity-plan.md) | this refactor |

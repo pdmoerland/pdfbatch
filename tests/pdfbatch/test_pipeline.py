@@ -286,12 +286,13 @@ def test_authors_with_affiliation_numbers():
     assert validate(f, pdf)[0] == "high"
 
 
-def test_search_hits_need_an_author():
-    # Slides titled like a textbook chapter: the title alone proves nothing for a search hit.
+def test_a_title_alone_confirms_nothing():
+    # Slides titled like a textbook chapter: a perfect title without the authors is no match.
     pdf = _pdf_with_text("Model Assessment\nand\nSelection\nAxel Benner\nBiostatistics, German Cancer Research Center")
     chapter = {"title": "Model Assessment and Selection", "authors": [Author("Hastie", "Trevor")]}
-    assert validate(chapter, pdf)[0] == "medium"                  # fine when the PDF printed this DOI
+    assert validate(chapter, pdf)[0] == "low"
     assert validate(chapter, pdf, all_authors=True)[0] == "low"
+    assert validate({"title": "Model Assessment and Selection"}, pdf)[0] == "low"     # no authors at all
 
 
 def test_search_hits_need_all_authors_spelled_nearly_right():

@@ -67,11 +67,11 @@ class Record:
     pdf_path: str = ""
     pdf_sha256: str = ""
     resolved_via: List[str] = field(default_factory=list)   # e.g. ['xmp-doi', 'crossref', 'openalex']
-    confidence: str = "unresolved"      # high | medium | low | unresolved
+    confidence: str = "unresolved"      # high | medium | unresolved
     notes: List[str] = field(default_factory=list)          # human-readable warnings
 
     # bibliographic
-    item_type: str = "journal-article"  # CrossRef vocabulary
+    item_type: Optional[str] = None     # CrossRef vocabulary
     title: Optional[str] = None
     authors: List[Author] = field(default_factory=list)
     journal: Optional[str] = None
@@ -104,7 +104,7 @@ class Record:
 
     @property
     def needs_review(self) -> bool:
-        return self.confidence in ("low", "unresolved")
+        return self.confidence == "unresolved"
 
     def to_dict(self) -> dict:
         return asdict(self)
