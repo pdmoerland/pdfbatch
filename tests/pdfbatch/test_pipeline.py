@@ -144,4 +144,5 @@ def test_ris_and_markdown(pdf_dir, http, tmp_path):
     assert "## Summary" not in text and "**Authors:**" not in text and "### " not in text
     assert text.split("## Papers\n\n", 1)[1].startswith("**File:** [`")
     assert "**Open access:** hybrid" in text and "🟠" not in text
+    assert "Abstract" not in text
     assert "*Nature Methods*, *21*(6), 1012–1024." in text

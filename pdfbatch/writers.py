@@ -194,18 +194,10 @@ def write_markdown(records: List[Record], path: Path, *, llm_usage: str = "") ->
             if ls:
                 out.append(f"**{kind.capitalize()}:** " + ", ".join(
                     f"[{l.url.split('://', 1)[-1]}]({l.url}){f' — {l.label}' if l.label else ''}" for l in ls) + "  ")
-        out.append(f"**Resolved:** {r.confidence} confidence via {' → '.join(r.resolved_via)}"
-                   + (f"; abstract from {r.abstract_source}" if r.abstract_source else ""))
+        out.append(f"**Resolved:** {r.confidence} confidence via {' → '.join(r.resolved_via)}")
         for n in r.notes:
             out.append(f"\n⚠️ {n}")
         out.append("")
-        if r.abstract:
-            out.append("<details><summary>Abstract</summary>")
-            out.append("")
-            out.append(_one_line(r.abstract))
-            out.append("")
-            out.append("</details>")
-            out.append("")
         out.append("---")
         out.append("")
     path.write_text("\n".join(out), encoding="utf-8")
