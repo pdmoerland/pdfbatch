@@ -196,6 +196,8 @@ def identify(http: apis.Http, s: Settings, pdf: PdfContent, rec: Record) -> None
         return
     rec.confidence, rec.resolved_via = "unresolved", ["pdf-only"]
     rec.title = pdf.title_guess or pdf.info.get("title") or pdf.path.stem
+    if rec.title.isupper():                    # a title page in capitals; don't cite it shouting
+        rec.title = rec.title.capitalize()
     if pdf.info.get("author"):
         rec.authors = [Author.from_display(a) for a in
                        re.split(r";|\band\b|,(?=\s*[A-Z][a-z]+\s+[A-Z])", pdf.info["author"]) if a.strip()]

@@ -167,7 +167,10 @@ def _title_guesses(tp, rect) -> List[str]:
         text = " ".join(t for _, _, t in run)
         text = re.sub(r"\s+", " ", text).strip()
         text = re.sub(r"-\s(?=[a-z])", "", text)    # de-hyphenate line breaks
-        if 15 <= len(text) <= 350 and not _TITLE_JUNK.match(text) and re.search(r"[a-z]", text):
+        # Three real words rather than "has lower case": theses and older papers set titles in
+        # capitals, while short banners ("NATURE GENETICS", letter-spaced "A R T I C L E S") are not titles.
+        words = sum(len(w) > 1 for w in text.split())
+        if 15 <= len(text) <= 350 and not _TITLE_JUNK.match(text) and words >= 3:
             guesses.append(text)
     return guesses
 

@@ -189,6 +189,22 @@ def test_scan_without_tesseract(scan, http, monkeypatch):
     assert r.confidence == "unresolved" and any("install Tesseract" in n for n in r.notes)
 
 
+def test_all_caps_title_page(tmp_path, http):
+    # Theses set the title in capitals, below a smaller university header.
+    doc = pymupdf.open()
+    fixtures._page(doc, [(50, 60, "KATHOLIEKE UNIVERSITEIT LEUVEN", 8),
+                         (50, 70, "NATURE GENETICS", 14),
+                         (50, 90, "A R T I C L E S", 13),
+                         (50, 290, "PROBABILISTIC METHODS TO SEARCH", 12),
+                         (50, 304, "FOR REGULATORY ELEMENTS", 12)])
+    doc.save(tmp_path / "thesis.pdf"); doc.close()
+    assert read_pdf(tmp_path / "thesis.pdf").title_guesses[0] == \
+        "PROBABILISTIC METHODS TO SEARCH FOR REGULATORY ELEMENTS"
+    r = process_pdf(tmp_path / "thesis.pdf", http, settings())
+    assert r.confidence == "unresolved"
+    assert r.title == "Probabilistic methods to search for regulatory elements"
+
+
 def test_title_search_falls_back_to_openalex(pdf_dir, http, monkeypatch):
     # CrossRef's top hits can all be records *about* the paper, which fail validation.
     real = apis.crossref_to_fields(fixtures.CR_SEARCH_C["message"]["items"][1])

@@ -44,7 +44,13 @@ Running pdfbatch on a real reading list (`_PDM/Reader/Transcription factors`) le
   - A scan without Tesseract.
 - **Not verified here:** real Tesseract output. Tesseract was not installed on the development machine.
 
+## All-caps titles
+
+`thijs_thesis.pdf` (KU Leuven PhD thesis, 2003) set its title in capitals. The title filter required a lower-case letter, so it fell back to the smaller university header. The rule is now "at least three words of two or more letters". That accepts all-caps titles and still rejects short banners ("BMC Bioinformatics") and letter-spaced headers ("A R T I C L E S"). An unresolved record whose title is all capitals gets it in sentence case.
+
+On the 58 PDFs, title guesses changed in 6. The thesis gets its real title first, two-word banners disappear, and one spaced author line is added as a harmless last guess. Resolution is unchanged for all 53 real PDFs.
+
 ## Remaining unresolved in that folder
 
-- `liu_motif.pdf` until Tesseract is installed.
-- `Roth_AlignAce.pdf` and `thijs_thesis.pdf`: not yet investigated.
+- `liu_motif.pdf` and `Roth_AlignAce.pdf`: image-only scans. They need Tesseract, then a rerun with `--force`.
+- `thijs_thesis.pdf`: no CrossRef or OpenAlex record exists, so it stays unresolved, now with its correct title. Author and year must be added by hand.
