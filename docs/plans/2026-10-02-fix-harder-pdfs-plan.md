@@ -113,6 +113,16 @@ Fixes:
 
 Overall: 92 high, 1 medium (Baggerly, the published version under a revised title), 7 unresolved.
 
+### Stricter: all authors, tolerant of typos
+
+Search hits now need **all** their authors in the PDF (`validate(..., all_authors=True)`).
+
+- **Exact matching alone** rejected one correct paper: `kamvysselis_yeast_motif.pdf`, whose record misspells Patterson as "Patterso".
+- **So names may differ slightly, scaled by length:** one character for 8–11 letters, two for 12 or more, checked word by word against the PDF's words (`_name_in`, rapidfuzz Levenshtein).
+- **A first try was too loose:** allowing one character from 6 letters let a "Faculty Opinions" review of `berman_pnas02.pdf` through, because its reviewer "States" matched "stages". The thresholds were raised to 8 and 12.
+
+Result: no record changes compared with the previous rule. Kamvysselis and Berman stay high, and the slides stay rejected.
+
 ## Remaining unresolved in that folder
 
 - `thijs_thesis.pdf`: no CrossRef or OpenAlex record exists, so it stays unresolved, now with its correct title. Author and year must be added by hand.

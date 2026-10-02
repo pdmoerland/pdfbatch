@@ -56,6 +56,11 @@ class PdfContent:
         return " ".join([l for l in lines if len(l) >= 15][:2]) or None
 
     @cached_property
+    def words(self) -> frozenset:
+        """The distinct words of `head`, without digits ("segal1" → "segal")."""
+        return frozenset(re.findall(r"[a-z]+", self.head))
+
+    @cached_property
     def head(self) -> str:
         """First three pages plus the Info title, normalised for fuzzy matching."""
         return normalize("\n".join(self.page_texts[:3]) + " " + str(self.info.get("title", "")))

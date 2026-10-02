@@ -11,7 +11,7 @@ from pdfbatch import apis, pdf_reader
 from pdfbatch.identifiers import clean_doi, find_candidates
 from pdfbatch.links import classify
 from pdfbatch.pdf_reader import PdfContent, read_pdf, unreadable
-from pdfbatch.pipeline import Settings, _resembles, process_pdf, validate
+from pdfbatch.pipeline import Settings, _name_in, _resembles, process_pdf, validate
 from pdfbatch.record import Author, Record
 from pdfbatch.writers import apa, ris_entry, write_markdown
 
@@ -291,7 +291,23 @@ def test_search_hits_need_an_author():
     pdf = _pdf_with_text("Model Assessment\nand\nSelection\nAxel Benner\nBiostatistics, German Cancer Research Center")
     chapter = {"title": "Model Assessment and Selection", "authors": [Author("Hastie", "Trevor")]}
     assert validate(chapter, pdf)[0] == "medium"                  # fine when the PDF printed this DOI
-    assert validate(chapter, pdf, need_author=True)[0] == "low"
+    assert validate(chapter, pdf, all_authors=True)[0] == "low"
+
+
+def test_search_hits_need_all_authors_spelled_nearly_right():
+    pdf = _pdf_with_text("Whole-genome comparative annotation and regulatory motif discovery\n"
+                         "Manolis Kamvysselis, Nick Patterson, Bruce Birren, Bonnie Berger, Eric Lander")
+    title = "Whole-genome comparative annotation and regulatory motif discovery"
+    names = lambda *fams: [Author(f, "X") for f in fams]
+    # A typo in the source record ("Patterso") does not reject the paper.
+    assert validate({"title": title, "authors": names("Kamvysselis", "Patterso", "Lander")},
+                    pdf, all_authors=True)[0] == "high"
+    # An author who is not on the paper does.
+    assert validate({"title": title, "authors": names("Kamvysselis", "Hastie", "Lander")},
+                    pdf, all_authors=True)[0] == "low"
+    # Short names must match exactly: "Then" is not "Chen".
+    assert not _name_in(_pdf_with_text("then and there"), "chen")
+    assert not _name_in(_pdf_with_text("developmental stages"), "states")
 
 
 def test_unreadable_text_layer():

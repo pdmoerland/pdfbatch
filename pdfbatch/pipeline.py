@@ -20,7 +20,8 @@ from pathlib import Path
 from typing import Iterator, Optional, Tuple
 
 import requests
-from rapidfuzz import fuzz
+from rapidfuzz import fuzz, process
+from rapidfuzz.distance import Levenshtein
 
 from . import apis
 from .identifiers import clean_doi, find_candidates
@@ -56,23 +57,42 @@ def _good(confidence: str) -> bool:
     return _RANK[confidence] >= _RANK["medium"]
 
 
-def validate(f: dict, pdf: PdfContent, *, need_author: bool = False) -> Tuple[str, float]:
+def _name_in(pdf: PdfContent, name: str) -> bool:
+    """A (normalised) family name occurs in the PDF.
+
+    Letters-only boundaries, because affiliation numbers stick to names in the text
+    ("segal1"). Source records have typos and truncations ("Patterso" for Patterson),
+    so long names may differ by one character (8–11 letters) or two (12+), word by
+    word. Shorter names must match exactly: one edit away, "Chen" is "then" and a
+    reviewer called "States" is "stages".
+    """
+    if re.search(rf"(?<![a-z]){re.escape(name)}(?![a-z])", pdf.head):
+        return True
+    return all(process.extractOne(w, pdf.words, scorer=Levenshtein.distance,
+                                  score_cutoff=0 if len(w) < 8 else 1 if len(w) < 12 else 2) is not None
+               for w in name.split())
+
+
+def validate(f: dict, pdf: PdfContent, *, all_authors: bool = False) -> Tuple[str, float]:
     """Does the API record describe *this* PDF? → (confidence, title score).
 
-    With `need_author`, a matching title alone is not enough. Use it for search hits:
-    a generic title ("Model Assessment and Selection") belongs to many works, while a
-    DOI printed in the PDF is evidence in itself.
+    By default one of the first five authors must be found in the PDF for `high`, and a
+    matching title alone gives `medium`. With `all_authors`, every author must be found
+    and the title alone gives nothing. Use it for search hits: a generic title ("Model
+    Assessment and Selection") belongs to many works, while a DOI printed in the PDF is
+    evidence in itself.
     """
     title = normalize(f.get("title"))
     if len(title.split()) < 3:                 # "32", "NCI & FDA": found in almost any text
         return "low", 0.0
     score = fuzz.partial_ratio(title, pdf.head) if pdf.head else 0.0
-    surnames = (normalize(a.family or a.literal.split(" ")[-1]) for a in (f.get("authors") or [])[:5])
-    # Letters-only boundaries: affiliation numbers stick to names in the text ("segal1").
-    named = any(len(s) > 1 and re.search(rf"(?<![a-z]){re.escape(s)}(?![a-z])", pdf.head) for s in surnames)
-    if score >= 90 and named:
+    found = [_name_in(pdf, s)
+             for s in (normalize(a.family or a.literal.split(" ")[-1]) for a in f.get("authors") or [])
+             if len(s) > 1]                    # a one-letter "family name" is a data error, not checkable
+    named = all(found) if all_authors else any(found[:5])
+    if score >= 90 and named and found:
         return "high", score
-    if (score >= 90 and not need_author) or (score >= 75 and named):
+    if (score >= 90 and not all_authors) or (score >= 75 and named and found):
         return "medium", score
     return "low", score
 
@@ -116,7 +136,7 @@ def _title_search(http: apis.Http, s: Settings, pdf: PdfContent, title: str,
     searches = (("crossref-search", lambda: apis.crossref_search(http, title, surname)),
                 ("openalex-search", lambda: apis.openalex_search(http, title, s.openalex_api_key)))
     for via, search in searches:
-        scored = [(validate(h, pdf, need_author=True), h) for h in search() if _resembles(title, h.get("title"))]
+        scored = [(validate(h, pdf, all_authors=True), h) for h in search() if _resembles(title, h.get("title"))]
         if scored:
             (conf, _), h = max(scored, key=lambda x: (_RANK[x[0][0]], x[0][1]))
             if _good(conf):
