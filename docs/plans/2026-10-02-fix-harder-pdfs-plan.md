@@ -42,7 +42,7 @@ Running pdfbatch on a real reading list (`_PDM/Reader/Transcription factors`) le
   - Three OpenAlex page cases and an APA article number.
   - A scan read by "OCR". The test substitutes the textpage of the page the scan was rendered from, because tests cannot assume Tesseract.
   - A scan without Tesseract.
-- **Not verified here:** real Tesseract output. Tesseract was not installed on the development machine.
+- **Real OCR:** verified once Tesseract 5.4 turned out to be installed but not on `PATH`. PyMuPDF only looks at `TESSDATA_PREFIX` and `PATH`, so `_tessdata()` now also checks the installers' standard folders. `liu_motif.pdf` (0.6 s OCR) → `10.1080/01621459.1995.10476622` and `Roth_AlignAce.pdf` (1.9 s) → `10.1038/nbt1098-939`, both high confidence. Roth's OCR title guesses are fragments, but CrossRef's search still finds it.
 
 ## All-caps titles
 
@@ -52,5 +52,4 @@ On the 58 PDFs, title guesses changed in 6. The thesis gets its real title first
 
 ## Remaining unresolved in that folder
 
-- `liu_motif.pdf` and `Roth_AlignAce.pdf`: image-only scans. They need Tesseract, then a rerun with `--force`.
 - `thijs_thesis.pdf`: no CrossRef or OpenAlex record exists, so it stays unresolved, now with its correct title. Author and year must be added by hand.

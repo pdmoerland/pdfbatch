@@ -183,6 +183,20 @@ def test_scan_is_read_by_ocr(scan, http, monkeypatch):
     assert "Scanned PDF: page 1 was read by OCR." in r.notes
 
 
+def test_tessdata_outside_path(tmp_path, monkeypatch):
+    # The Windows installer does not put Tesseract on PATH; look in its standard folders.
+    def not_on_path():
+        raise RuntimeError("No tessdata specified and Tesseract is not installed")
+    (tmp_path / "eng.traineddata").touch()
+    monkeypatch.setattr(pymupdf, "get_tessdata", not_on_path)
+    monkeypatch.setattr(pdf_reader, "_TESSDATA_DIRS", (str(tmp_path / "missing"), str(tmp_path)))
+    pdf_reader._tessdata.cache_clear()
+    try:
+        assert pdf_reader._tessdata() == str(tmp_path)
+    finally:
+        pdf_reader._tessdata.cache_clear()
+
+
 def test_scan_without_tesseract(scan, http, monkeypatch):
     monkeypatch.setattr(pdf_reader, "_ocr", lambda page: None)
     r = process_pdf(scan[0], http, settings())

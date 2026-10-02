@@ -12,7 +12,7 @@ uv run pdf-batch ~/papers --mailto you@uni.nl --unpaywall
 
 `uv sync` creates `.venv` if needed and installs the locked dependencies, so it is safe to rerun. The commands work the same in bash, PowerShell and cmd.
 
-**Scanned PDFs (optional):** install [Tesseract](https://tesseract-ocr.github.io/tessdoc/Installation.html) (on Windows the [UB Mannheim build](https://github.com/UB-Mannheim/tesseract/wiki), or `winget install UB-Mannheim.TesseractOCR`) and page 1 of a PDF without a text layer is OCR'd automatically. Without Tesseract such PDFs are flagged.
+**Scanned PDFs (optional):** install [Tesseract](https://tesseract-ocr.github.io/tessdoc/Installation.html) (on Windows the [UB Mannheim build](https://github.com/UB-Mannheim/tesseract/wiki), or `winget install UB-Mannheim.TesseractOCR`) and page 1 of a PDF without a text layer is OCR'd automatically. Tesseract is found via `TESSDATA_PREFIX`, on `PATH`, or in its standard install folder (the Windows installer does not add it to `PATH`). Without Tesseract such PDFs are flagged.
 
 `CONTACT_MAILTO` in a `.env` file (searched from the current directory upwards; see `.env.example`) works instead of `--mailto`. Reruns are incremental: PDFs are keyed by SHA-256, so only new files are processed and renamed files are recognised. Use `--force` to redo everything.
 

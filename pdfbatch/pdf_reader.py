@@ -5,7 +5,9 @@ Nothing here touches the network or an LLM.
 
 from __future__ import annotations
 
+import functools
 import hashlib
+import os
 import re
 import unicodedata
 from dataclasses import dataclass, field
@@ -101,15 +103,40 @@ def read_pdf(path: Path) -> PdfContent:
         doc.close()
 
 
+# Where the usual installers put Tesseract's language files. The Windows installer does not
+# add Tesseract to PATH, which is how PyMuPDF looks for it (besides TESSDATA_PREFIX).
+_TESSDATA_DIRS = (
+    r"C:\Program Files\Tesseract-OCR\tessdata",
+    r"C:\Program Files (x86)\Tesseract-OCR\tessdata",
+    os.path.expandvars(r"%LOCALAPPDATA%\Programs\Tesseract-OCR\tessdata"),
+    "/opt/homebrew/share/tessdata",
+    "/usr/local/share/tessdata",
+    "/usr/share/tesseract-ocr/5/tessdata",
+    "/usr/share/tesseract-ocr/4.00/tessdata",
+)
+
+
+@functools.cache
+def _tessdata() -> Optional[str]:
+    try:
+        return pymupdf.get_tessdata()          # TESSDATA_PREFIX, or a tesseract on PATH
+    except RuntimeError:
+        return next((d for d in _TESSDATA_DIRS if Path(d, "eng.traineddata").is_file()), None)
+
+
 def _ocr(page) -> Optional["pymupdf.TextPage"]:
     """Page text by OCR, for scans without a text layer; None when Tesseract is not installed.
 
     Only page 1 is read: it carries the title, authors and often a citation block
     (JSTOR cover pages), which is all identification needs.
     """
+    tessdata = _tessdata()
+    if not tessdata:
+        return None
     try:
-        return page.get_textpage_ocr(flags=pymupdf.TEXTFLAGS_TEXT, language="eng", dpi=300, full=True)
-    except RuntimeError:                       # "Tesseract is not installed"
+        return page.get_textpage_ocr(flags=pymupdf.TEXTFLAGS_TEXT, language="eng", dpi=300, full=True,
+                                     tessdata=tessdata)
+    except RuntimeError:                       # a failed OCR leaves the PDF unread, not unopened
         return None
 
 
