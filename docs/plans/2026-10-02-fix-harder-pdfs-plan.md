@@ -28,6 +28,7 @@ Running pdfbatch on a real reading list (`_PDM/Reader/Transcription factors`) le
   - with OCR: "Scanned PDF: page 1 was read by OCR."
   - without Tesseract: what to install, and to rerun with `--force`. The record is cached by hash, so a plain rerun would skip it.
 - **No new options.** OCR switches itself on once Tesseract is present.
+- **One page at a time.** Leptonica, Tesseract's image library, fails when two worker threads OCR at once (`Attempt to use Leptonica from 2 threads at once!`, raised as a MuPDF `FzErrorBase`, not a `RuntimeError`). A lock serialises OCR, about 1–2 s per scan, while everything else stays parallel, and the guard also catches MuPDF errors, so a failed OCR never turns into "Could not open PDF".
 
 ## Verification
 

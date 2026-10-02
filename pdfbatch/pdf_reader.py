@@ -9,6 +9,7 @@ import functools
 import hashlib
 import os
 import re
+import threading
 import unicodedata
 from dataclasses import dataclass, field
 from functools import cached_property
@@ -116,6 +117,11 @@ _TESSDATA_DIRS = (
 )
 
 
+# Leptonica, Tesseract's image library, refuses use from two threads at once
+# ("Attempt to use Leptonica from 2 threads at once!"); OCR one page at a time.
+_OCR_LOCK = threading.Lock()
+
+
 @functools.cache
 def _tessdata() -> Optional[str]:
     try:
@@ -134,9 +140,10 @@ def _ocr(page) -> Optional["pymupdf.TextPage"]:
     if not tessdata:
         return None
     try:
-        return page.get_textpage_ocr(flags=pymupdf.TEXTFLAGS_TEXT, language="eng", dpi=300, full=True,
-                                     tessdata=tessdata)
-    except RuntimeError:                       # a failed OCR leaves the PDF unread, not unopened
+        with _OCR_LOCK:
+            return page.get_textpage_ocr(flags=pymupdf.TEXTFLAGS_TEXT, language="eng", dpi=300, full=True,
+                                         tessdata=tessdata)
+    except (RuntimeError, pymupdf.mupdf.FzErrorBase):    # a failed OCR leaves the PDF unread, not unopened
         return None
 
 

@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import time
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 import pymupdf
@@ -195,6 +197,24 @@ def test_tessdata_outside_path(tmp_path, monkeypatch):
         assert pdf_reader._tessdata() == str(tmp_path)
     finally:
         pdf_reader._tessdata.cache_clear()
+
+
+def test_ocr_one_page_at_a_time(scan, monkeypatch):
+    # Leptonica fails when two threads OCR at once; the workers must take turns.
+    running, most = [0], [0]
+
+    def fake_ocr(page, **kw):
+        running[0] += 1
+        most[0] = max(most[0], running[0])
+        time.sleep(0.05)
+        running[0] -= 1
+        return scan[1].get_textpage(flags=pymupdf.TEXTFLAGS_TEXT)
+
+    monkeypatch.setattr(pdf_reader, "_tessdata", lambda: "tessdata")
+    monkeypatch.setattr(pymupdf.Page, "get_textpage_ocr", fake_ocr)
+    with ThreadPoolExecutor(4) as ex:
+        results = list(ex.map(lambda _: read_pdf(scan[0]), range(4)))
+    assert all(p.ocr for p in results) and most[0] == 1
 
 
 def test_scan_without_tesseract(scan, http, monkeypatch):
