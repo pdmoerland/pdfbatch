@@ -27,3 +27,8 @@ uv run pytest                     # offline: synthetic PDFs + mocked APIs
 
 - Secrets and contact e-mail go in `.env` (gitignored), never in committed files.
 - The LLM never writes metadata; it only proposes a title/DOI that goes back through API lookup + validation.
+
+## Design history
+
+- `design_decisions_and_rationale.md` — the why behind tiers, validation, outputs and code shape.
+- `docs/plans/YYYY-MM-DD-<type>-<slug>-plan.md` — one file per implementation iteration, with `status` and `iteration` in the frontmatter. Add one for each new iteration and link it from the design doc's "Implementation history" table.

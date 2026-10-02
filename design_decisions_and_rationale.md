@@ -1,0 +1,273 @@
+# Design decisions & rationale
+
+Long-form explanations of *why* pdfbatch is shaped the way it is. The [README](README.md) says how to install and run it. Use this file when its behaviour surprises you. How the code got here is told iteration by iteration in [`docs/plans/`](docs/plans/), listed under [Implementation history](#implementation-history).
+
+## Contents
+
+- [The problem](#the-problem)
+- [Identify first, then ask structured APIs](#identify-first-then-ask-structured-apis)
+- [Identification tiers, cheapest first](#identification-tiers-cheapest-first)
+- [Validation: does this record describe *this* PDF?](#validation-does-this-record-describe-this-pdf)
+- [The LLM only proposes a search key](#the-llm-only-proposes-a-search-key)
+- [Enrichment and field precedence](#enrichment-and-field-precedence)
+- [Open access](#open-access)
+- [Preprints and published versions](#preprints-and-published-versions)
+- [Code & data links](#code--data-links)
+- [Outputs: JSON is the truth, RIS and Markdown are views](#outputs-json-is-the-truth-ris-and-markdown-are-views)
+- [Incremental reruns](#incremental-reruns)
+- [Being a polite API client](#being-a-polite-api-client)
+- [Dependencies](#dependencies)
+- [Code shape](#code-shape)
+- [Implementation history](#implementation-history)
+
+---
+
+## The problem
+
+You have a folder of PDFs and want them in EndNote or Zotero with correct, structured metadata: split author names, journal, volume, issue, pages, DOI. You also want to know which papers are open access and whether they share code or data. Reference managers' own "retrieve metadata from PDF" features are unreliable. Most often they pick up a DOI from the reference list.
+
+pdfbatch started as a spin-off of a Slack bot that resolved paper *links* DOI-first. It was then cut loose as a standalone tool. Its central bet is the same: **find an identifier, then let authoritative APIs supply the metadata.** Scraping and LLMs are kept to the margins.
+
+---
+
+## Identify first, then ask structured APIs
+
+For each PDF the pipeline is: **identify → resolve → validate → enrich → find links** ([`pipeline.py`](pdfbatch/pipeline.py)).
+
+- **Resolve.** A DOI goes to CrossRef first. If CrossRef doesn't know it, it goes to OpenAlex, which also covers DataCite DOIs (arXiv, Zenodo). An arXiv ID goes to the arXiv API.
+- **Enrich.** OpenAlex, Europe PMC and optionally Unpaywall fill the gaps.
+
+**Why.** Structured APIs return stable, typed fields: given and family names, volume, issue, pages, ISSN, item type and preprint relations. A reference manager needs exactly these, and text extraction cannot supply them reliably. CrossRef alone covers the vast majority of journal articles.
+
+---
+
+## Identification tiers, cheapest first
+
+Each tier runs only when the previous one produced nothing that validates ([`identifiers.py`](pdfbatch/identifiers.py), `_fallbacks` in [`pipeline.py`](pdfbatch/pipeline.py)).
+
+| Tier | Source | Cost |
+|---|---|---|
+| 1 | XMP (`prism:doi`, `dc:identifier`, …) and the PDF Info dict | 0 |
+| 2 | DOI / arXiv regex by position: page-1 header/footer and margins → page 1 → page 2 → tail of the last page | 0 |
+| 3 | Largest-font title on page 1 (then the Info title) → CrossRef `query.bibliographic` → OpenAlex search | 0 tokens |
+| 4 | GROBID header parse (`--grobid URL`), then DOI or title lookup | 0 tokens |
+| 5 | LLM search key from page 1 (`--llm anthropic\|ollama`) | ~1.5k tokens, rare |
+
+**Position beats frequency.** The real hazard is a cited paper's DOI, so candidates are scored by *where* they appear:
+
+| Where the DOI appears | Score |
+|---|---|
+| XMP | 1.0 |
+| Info dict | 0.95 |
+| Header/footer band | 0.9 |
+| Page 1 | 0.8, dropping 0.1 for each earlier DOI on the page |
+| Page 2 | 0.5 |
+| End of the last page | 0.3, and only if that page has no References heading |
+
+Text after a References heading is never searched, and a DOI seen in several places gets a small bonus. DOIs of data repositories (Zenodo, figshare, Dryad, OSF, Synapse) are never taken as the article's own.
+
+**The title guess** joins the lines set in the largest font in the top 60% of page 1, keeping the first vertically contiguous run. The result must be 15–350 characters and must not look like a journal banner or "Research article". It is cheap and good enough for journal PDFs; GROBID and the LLM catch the rest.
+
+**Laziness is structural.** Tiers 3–5 are a generator, and `identify` takes the first good hit with `next(...)`. So a GROBID server or an LLM is never contacted for a PDF that a cheaper tier already identified.
+
+---
+
+## Validation: does this record describe *this* PDF?
+
+Every API hit is checked against the PDF text before it is accepted (`validate`).
+
+1. **Title.** The API title is fuzzy-matched against the first three pages plus the Info title, using `rapidfuzz.partial_ratio`. Both sides are normalised: accents, ligatures, hyphenated line breaks and punctuation are removed.
+2. **Authors.** The family names of up to the first five authors must appear as whole words in that text.
+
+| Confidence | Rule |
+|---|---|
+| `high` | title ≥ 90 **and** an author found |
+| `medium` | title ≥ 90, **or** title ≥ 75 and an author found |
+| `low` | anything else |
+| `unresolved` | no API record at all; PDF-derived title and Info-dict authors only |
+
+**How the result is used:**
+- **Accepted:** `medium` and above.
+- **Low-confidence fallback:** if nothing better turns up, a `low` hit is kept, with a note saying so.
+- **Review flag:** `low` and `unresolved` records are listed under "Needs review" in Markdown and tagged `pdfbatch: needs review` in RIS, so you can filter them in your reference manager.
+- **Title-search guard:** search hits must also resemble the query (`token_set_ratio` ≥ 85) before they are validated. This stops a search for a short, generic title from wandering off.
+
+**Why.** Without validation, the first DOI on page 1 is often a reference ("Earlier atlases (doi:…) lacked …"). One cheap fuzzy match catches this.
+
+---
+
+## The LLM only proposes a search key
+
+The LLM tier is off by default ([`llm.py`](pdfbatch/llm.py)).
+
+- **Input:** at most 6,000 characters of page-1 text.
+- **Output:** JSON with `title`, `first_author_surname`, `year` and `doi`. That key goes back through the normal DOI lookup or title search, and then through validation.
+- **Never metadata:** **the LLM never writes metadata into the RIS file.** A hallucinated title simply fails validation.
+- **Backends:**
+  - **Anthropic:** default model `claude-haiku-4-5`.
+  - **Ollama:** default model `qwen3:8b`, using native `/api/chat` with a JSON-schema `format` and `think: false`.
+- **Cost reporting:** token use is tallied and printed, and appears at the top of `papers.md`.
+
+---
+
+## Enrichment and field precedence
+
+- **Merge rule:** the record that identified the paper is merged with *override*. Later sources only fill fields that are still empty (`_merge`).
+- **Abstract priority:** CrossRef → Europe PMC (curated) → OpenAlex (rebuilt from an inverted index, occasionally truncated) → a slice of the PDF's own page 1–2 text. The winner is recorded in `abstract_source` in the JSON.
+- **Europe PMC** is queried only when the abstract or PMID is still missing. It adds PMID, PMCID and keywords for biomedical papers.
+- **CrossRef licences** (version-of-record or unspecified) fill the OA licence when the OA sources don't give one.
+
+The abstract goes to RIS (`AB`) and JSON. It was deliberately taken out of `papers.md` to keep that file short (see [iteration 3](docs/plans/2026-10-02-feat-simplify-markdown-output-plan.md)).
+
+---
+
+## Open access
+
+OA status is one of `gold`, `diamond`, `hybrid`, `bronze`, `green` or `closed`, with licence, version and a free-copy URL where known.
+
+- **Unpaywall** (`--unpaywall`) wins when it returns a status. It needs a real e-mail address, so it is opt-in. If Unpaywall has no licence, the one already known is kept.
+- **OpenAlex** otherwise.
+- **The preprint rule:** arXiv, bioRxiv/medRxiv, Research Square, Preprints.org, PsyArXiv, OSF Preprints, TechRxiv, Authorea and SSRN DOIs are green OA by definition (source `rule`).
+- **No data:** when nothing is known for a DOI, a note says so rather than guessing.
+
+A `closed` paper whose PDF you hold came through a subscription. The flag is there so you don't redistribute it.
+
+---
+
+## Preprints and published versions
+
+CrossRef's `is-preprint-of` / `has-preprint` relations and arXiv's `<arxiv:doi>` link the versions of a paper.
+
+- **Default (`--prefer held`):** the record describes the version you hold, with a note pointing to the other version.
+- **`--prefer published`:** the published record replaces the bibliographic fields. Journal-specific fields are cleared first, so no arXiv leftovers remain. The preprint becomes `related_doi`, and the OA data is reset so that enrichment fetches the published version's status.
+
+**Why default to the held version.** The PDF is what you will annotate and cite from. Silently citing a different version would be surprising.
+
+---
+
+## Code & data links
+
+[`links.py`](pdfbatch/links.py) finds the paper's *own* code and data:
+
+1. **Sources:** the full text, plus the PDF's link annotations. Annotations survive line-wrapped URLs; the text is also repaired by re-joining URLs broken at line ends.
+2. **Recognised platforms:** GitHub, GitLab, Bitbucket, Codeberg (code); Hugging Face, Zenodo, figshare, Dryad, OSF, Synapse (data). Each URL is canonicalised. For example, `github.com/org/repo/tree/main/src` becomes `github.com/org/repo`, and `zenodo.org/records/N` becomes its DOI.
+3. **Site pages:** reserved first path segments (`github.com/features`, `huggingface.co/docs`) are rejected as site pages.
+4. **Cited tools:** **links inside a References section are dropped.** That section runs from the heading to the next Methods, Data availability, Acknowledgements, … heading.
+5. **Blocklist:** a short list of framework repos that many papers cite (PyTorch, TensorFlow, transformers, NumPy, …) and arXiv/ar5iv site chrome.
+6. **`--check-links`:** HEAD-checks platforms where content can disappear. DOI-registered platforms are permanent by contract and skipped. A 429 counts as alive (rate-limited, not dead). Results are cached for 30 days.
+7. **Labels:** a label comes from a tag in front of the URL ("Weights: https://…") or a trigger phrase up to 200 characters before it ("Data are available at"). Labels that say nothing beyond the link's kind or platform ("Code", "GitHub", "Zenodo") are dropped.
+8. **Limit:** at most five links per kind.
+
+---
+
+## Outputs: JSON is the truth, RIS and Markdown are views
+
+Every run writes three files to `<input>/_metadata/` ([`writers.py`](pdfbatch/writers.py)).
+
+### `papers.json`
+
+The full records, and the only file that is read back.
+
+### `papers.ris`
+
+For import into EndNote or Zotero.
+
+- **Encoding:** UTF-8 with CRLF line endings. `--bom` adds a byte-order mark for old EndNote versions.
+- **Fields:**
+  - **Authors:** one `AU  - Family, Given` per author.
+  - **Date:** `DA` as `YYYY/MM/DD/`.
+  - **Pages:** `SP`/`EP`. Article numbers go in `SP` and `M1`, because EndNote reads `M1` as the article number.
+- **Preprints:** exported as `JOUR` with the server as the journal, because that imports cleanly everywhere. `--preprint-ris-type UNPB` is available.
+- **`KW` keywords:** for OA status, licence, *Has code* / *Has data* and the review flag. They become **tags** in Zotero, so they are filterable.
+- **`N1` note:** collects OA details, links, warnings and the resolution route.
+- **`L1` attachment:** a `file://` URI by default (`--attach path|none` to change), so the PDF is attached on import.
+- **Sorting:** by first author, year, title.
+
+### `papers.md`
+
+An overview for humans, kept deliberately lean:
+
+- a one-line summary;
+- a "Needs review" list;
+- per paper:
+  - the **File** line first, because the file is what you have in hand;
+  - the APA 7 citation;
+  - DOI and other IDs;
+  - an open-access line in plain text, with no emoji, since those render as boxes in some viewers;
+  - code and data links;
+  - how the paper was resolved;
+  - any warnings.
+
+There is no summary table, no title heading, no separate author list and no abstract. The citation already carries title and authors.
+
+### APA formatting
+
+APA formatting works on structured `Author` objects:
+
+- **People:** a family name plus initials.
+- **Organisations:** kept as written.
+- **Long author lists:** more than 20 authors gives the first 19, an ellipsis and the last.
+- **Titles:** sentence case, but acronyms and mixed-case words (`DNA`, `iPSC`) are kept.
+
+---
+
+## Incremental reruns
+
+Records are keyed by the PDF's SHA-256 ([`cli.py`](pdfbatch/cli.py)).
+
+- **Reruns:** only new files are processed. A renamed or moved file is recognised and its `pdf_path` updated.
+- **`--force`:** redoes everything.
+- **Failures:** a PDF that cannot be opened, or a worker that crashes, gets a record with a note, and the batch continues. Those records carry no hash, so they are retried on the next run.
+
+---
+
+## Being a polite API client
+
+All HTTP goes through one shared `Http` instance ([`apis.py`](pdfbatch/apis.py)):
+
+- **User-Agent** with `mailto:`. This gets CrossRef and OpenAlex "polite pool" treatment, which is why `--mailto` / `CONTACT_MAILTO` is required.
+- **Throttling** per host: 0.12 s between requests in general, and 3 s for arXiv, as its API terms ask.
+- **Retries** on 429/5xx with exponential backoff, honouring `Retry-After`.
+- **A 30-day disk cache** in `.pdfbatch_cache/`. 404s are cached too, so reruns and repeated lookups are nearly free.
+
+PDFs are processed by four worker threads by default (`--workers`). The work is network-bound, and the shared throttle keeps parallelism polite.
+
+---
+
+## Dependencies
+
+Five runtime dependencies: `requests`, `diskcache`, `python-dotenv`, `pymupdf` and `rapidfuzz`. There is no LLM SDK; both LLM backends are plain HTTP.
+
+**PyMuPDF is AGPL.** It was chosen for one-pass access to text, font sizes (needed for the title guess), clipping (header and margin bands), XMP and link annotations. If AGPL matters for redistribution, only [`pdf_reader.py`](pdfbatch/pdf_reader.py) needs to be swapped, for pypdf plus pdfplumber.
+
+---
+
+## Code shape
+
+The package has ten modules, about 1,800 lines, and one data flow:
+
+```
+cli ──► pipeline.process_pdf ──► pdf_reader.read_pdf
+                              ├► identifiers.find_candidates
+                              ├► apis.*            (+ llm, GROBID)
+                              └► links.find_links
+    ──► writers (json, ris, md)
+```
+
+Principles applied in [iteration 4](docs/plans/2026-10-02-refactor-minimal-elegant-code-plan.md):
+
+- **One definition per idea:** "needs review", the OA rule, URL canonicalisation and the DOI-then-title lookup each exist once.
+- **No knobs nobody turns:** settings live in `Settings` only if the CLI can set them; fixed policy lives in module constants (`MAX_PER_KIND`, `BLOCKLIST`).
+- **No code for impossible cases:** required dependencies are imported directly, without `try: import` guards.
+- **Refactors must not change output:** Markdown and RIS for the test fixtures are compared byte-for-byte before and after.
+
+---
+
+## Implementation history
+
+| # | Plan | Commit(s) |
+|---|---|---|
+| 1 | [pdfbatch inside the paperbot](docs/plans/2026-10-02-feat-pdfbatch-batch-pdf-metadata-plan.md) | (on the former `pdfbatch` branch; not in history) |
+| 2 | [Standalone tool](docs/plans/2026-10-02-refactor-standalone-pdfbatch-plan.md) | `ec51861` |
+| 3 | [Leaner Markdown output](docs/plans/2026-10-02-feat-simplify-markdown-output-plan.md) | `844ac08`, `3d9e172` |
+| 4 | [Minimal, elegant code](docs/plans/2026-10-02-refactor-minimal-elegant-code-plan.md) | `df2dcc4` |

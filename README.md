@@ -97,3 +97,7 @@ The tests generate synthetic PDFs and mock the APIs with real response shapes, s
 - an unresolvable PDF
 - references-section link exclusion
 - RIS/Markdown structure
+
+## Design and history
+
+Why pdfbatch works the way it does is explained in [design_decisions_and_rationale.md](design_decisions_and_rationale.md). Each implementation iteration is summarised in [docs/plans/](docs/plans/).
