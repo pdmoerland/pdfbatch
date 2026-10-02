@@ -90,15 +90,23 @@ def _resolve(http: apis.Http, s: Settings, kind: str, value: str) -> Optional[di
 
 def _title_search(http: apis.Http, s: Settings, pdf: PdfContent, title: str,
                   surname: Optional[str] = None) -> Tuple[Optional[dict], str]:
-    hits = ([(h, "crossref-search") for h in apis.crossref_search(http, title, surname)]
-            or [(h, "openalex-search") for h in apis.openalex_search(http, title, s.openalex_api_key)])
-    scored = [(validate(h, pdf), h, via) for h, via in hits
-              if fuzz.token_set_ratio(normalize(title), normalize(h.get("title"))) >= 85]
-    if not scored:
-        return None, "low"
-    (conf, _), h, via = max(scored, key=lambda x: (_RANK[x[0][0]], x[0][1]))
-    h["_via"] = via
-    return h, conf
+    """CrossRef, then OpenAlex: the best hit that resembles `title` and validates.
+
+    OpenAlex is asked whenever CrossRef has nothing *usable*, not only nothing at all:
+    CrossRef's top rows can all be records *about* the paper ("Faculty Opinions
+    recommendation of <title>") that rightly fail validation.
+    """
+    searches = (("crossref-search", lambda: apis.crossref_search(http, title, surname)),
+                ("openalex-search", lambda: apis.openalex_search(http, title, s.openalex_api_key)))
+    for via, search in searches:
+        scored = [(validate(h, pdf), h) for h in search()
+                  if fuzz.token_set_ratio(normalize(title), normalize(h.get("title"))) >= 85]
+        if scored:
+            (conf, _), h = max(scored, key=lambda x: (_RANK[x[0][0]], x[0][1]))
+            if _good(conf):
+                h["_via"] = via
+                return h, conf
+    return None, "low"
 
 
 def _lookup(http: apis.Http, s: Settings, pdf: PdfContent, doi: Optional[str], title: Optional[str],

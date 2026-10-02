@@ -132,6 +132,18 @@ def test_title_search_without_doi(pdf_dir, http):
     assert r.oa.status == "closed" and r.oa.is_oa is False
 
 
+def test_title_search_falls_back_to_openalex(pdf_dir, http, monkeypatch):
+    # CrossRef's top hits can all be records *about* the paper, which fail validation.
+    real = apis.crossref_to_fields(fixtures.CR_SEARCH_C["message"]["items"][1])
+    review = dict(real, doi="10.3410/f.1002148.52456", authors=[Author("Reviewer", "R")],
+                  title="Faculty Opinions recommendation of " + real["title"])
+    monkeypatch.setattr(apis, "crossref_search", lambda *a, **k: [review])
+    monkeypatch.setattr(apis, "openalex_search", lambda *a, **k: [dict(real)])
+    r = process_pdf(pdf_dir / "scan_0042.pdf", http, settings())
+    assert r.doi == "10.1105/tpc.23.00001" and r.confidence == "high"
+    assert r.resolved_via[:2] == ["title-search", "openalex-search"]
+
+
 def test_biorxiv_rule_oa(pdf_dir, http):
     r = process_pdf(pdf_dir / "rossi_biorxiv.pdf", http, settings())
     assert r.doi == "10.1101/2024.03.15.585123"
