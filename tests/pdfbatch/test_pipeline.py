@@ -141,4 +141,7 @@ def test_ris_and_markdown(pdf_dir, http, tmp_path):
     write_markdown(recs, md)
     text = md.read_text(encoding="utf-8")
     assert "## Needs review" in text and "protocol.pdf" in text
+    assert "## Summary" not in text and "**Authors:**" not in text and "### " not in text
+    assert text.split("## Papers\n\n", 1)[1].startswith("**File:** [`")
+    assert "**Open access:** hybrid" in text and "🟠" not in text
     assert "*Nature Methods*, *21*(6), 1012–1024." in text

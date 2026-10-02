@@ -152,23 +152,6 @@ def sort_key(r: Record):
 # Markdown
 # ---------------------------------------------------------------------------
 
-_OA_BADGE = {
-    "gold": "🟡 gold", "diamond": "💎 diamond", "hybrid": "🟠 hybrid",
-    "bronze": "🟤 bronze", "green": "🟢 green", "closed": "🔒 closed",
-}
-
-
-def _cell(s: str) -> str:
-    return _one_line(s).replace("|", "\\|")
-
-
-def _first_author(r: Record) -> str:
-    if not r.authors:
-        return "—"
-    a = r.authors[0].family or r.authors[0].literal
-    return a + (" et al." if len(r.authors) > 1 else "")
-
-
 def write_markdown(records: List[Record], path: Path, *, llm_usage: str = "") -> None:
     recs = sorted(records, key=sort_key)
     n_oa = sum(1 for r in recs if r.oa.is_oa)
@@ -188,45 +171,21 @@ def write_markdown(records: List[Record], path: Path, *, llm_usage: str = "") ->
             out.append(f"- `{Path(r.pdf_path).name}` — {r.confidence}: {'; '.join(r.notes) or 'weak match'}")
         out.append("")
 
-    out.append("## Summary")
-    out.append("")
-    out.append("| # | Title | First author | Year | Journal | OA | Code / data | File |")
-    out.append("|---|---|---|---|---|---|---|---|")
-    for i, r in enumerate(recs, 1):
-        title = _cell(r.title or "—")
-        if len(title) > 90:
-            title = title[:87] + "…"
-        anchor = f"[{title}](#p{i})"
-        oa = _OA_BADGE.get(r.oa.status or "", "❔ unknown")
-        cd = " ".join(x for x in (
-            "💻" if any(l.kind == "code" for l in r.links) else "",
-            "🗄️" if any(l.kind == "data" for l in r.links) else "") if x) or "—"
-        out.append(f"| {i} | {anchor} | {_cell(_first_author(r))} | {r.year or '—'} | "
-                   f"{_cell(r.journal or '—')} | {oa} | {cd} | `{_cell(Path(r.pdf_path).name)}` |")
-    out.append("")
-
     out.append("## Papers")
     out.append("")
-    for i, r in enumerate(recs, 1):
-        out.append(f'<a id="p{i}"></a>')
-        out.append(f"### {i}. {_one_line(r.title or Path(r.pdf_path).stem)}")
+    for r in recs:
+        out.append(f"**File:** [`{Path(r.pdf_path).name}`]({Path(r.pdf_path).as_uri()})")
         out.append("")
         out.append(f"> {apa(r)}")
         out.append("")
-        if r.authors:
-            names = ", ".join(a.display() for a in r.authors[:12])
-            if len(r.authors) > 12:
-                names += f" … (+{len(r.authors) - 12} more)"
-            out.append(f"**Authors:** {names}  ")
         if r.doi:
             out.append(f"**DOI:** [{r.doi}](https://doi.org/{r.doi})  ")
         ids = [x for x in (f"arXiv:{r.arxiv_id}" if r.arxiv_id else "",
                            f"PMID {r.pmid}" if r.pmid else "", r.pmcid or "") if x]
         if ids:
             out.append(f"**Other IDs:** {', '.join(ids)}  ")
-        oa = _OA_BADGE.get(r.oa.status or "", "❔ unknown")
         extra = ", ".join(x for x in (r.oa.license, r.oa.version) if x)
-        oa_line = f"**Open access:** {oa}{f' ({extra})' if extra else ''}"
+        oa_line = f"**Open access:** {r.oa.status or 'unknown'}{f' ({extra})' if extra else ''}"
         if r.oa.url:
             oa_line += f" — [free copy]({r.oa.url})"
         out.append(oa_line + "  ")
@@ -235,7 +194,6 @@ def write_markdown(records: List[Record], path: Path, *, llm_usage: str = "") ->
             if ls:
                 out.append(f"**{kind.capitalize()}:** " + ", ".join(
                     f"[{l.url.split('://', 1)[-1]}]({l.url}){f' — {l.label}' if l.label else ''}" for l in ls) + "  ")
-        out.append(f"**File:** [`{Path(r.pdf_path).name}`]({Path(r.pdf_path).as_uri()})  ")
         out.append(f"**Resolved:** {r.confidence} confidence via {' → '.join(r.resolved_via)}"
                    + (f"; abstract from {r.abstract_source}" if r.abstract_source else ""))
         for n in r.notes:
@@ -248,6 +206,8 @@ def write_markdown(records: List[Record], path: Path, *, llm_usage: str = "") ->
             out.append("")
             out.append("</details>")
             out.append("")
+        out.append("---")
+        out.append("")
     path.write_text("\n".join(out), encoding="utf-8")
 
 
