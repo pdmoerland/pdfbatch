@@ -21,11 +21,6 @@ class Author:
             return f"{self.family}, {self.given}".rstrip(", ")
         return self.literal
 
-    def display(self) -> str:
-        if self.family:
-            return f"{self.given} {self.family}".strip()
-        return self.literal
-
     @classmethod
     def from_display(cls, name: str) -> "Author":
         """Best-effort split of 'Given Middle Family' or 'Family, Given'."""
@@ -105,12 +100,9 @@ class Record:
     oa: OpenAccess = field(default_factory=OpenAccess)
     links: List[Link] = field(default_factory=list)
 
-    # ------------------------------------------------------------------
-    def first_author_family(self) -> Optional[str]:
-        if not self.authors:
-            return None
-        a = self.authors[0]
-        return a.family or a.literal or None
+    @property
+    def needs_review(self) -> bool:
+        return self.confidence in ("low", "unresolved")
 
     def to_dict(self) -> dict:
         return asdict(self)

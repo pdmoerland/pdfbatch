@@ -7,7 +7,6 @@
 ```bash
 uv venv && uv pip install -e '.[dev]'
 uv run pdf-batch ~/papers --mailto you@uni.nl --unpaywall
-# (or, from the checkout: uv run pdf_batch.py ~/papers ...)
 # → ~/papers/_metadata/papers.md, papers.ris, papers.json
 ```
 
@@ -45,7 +44,7 @@ A `closed` paper whose PDF you hold came through a subscription, so don't redist
 
 ## Code & data
 
-Code and data links are found in the PDF full text plus its link annotations, which survive line-wrapped URLs. Patterns and a blocklist of commonly cited frameworks live in `pdfbatch/link_patterns.py`.
+Code and data links are found in the PDF full text plus its link annotations, which survive line-wrapped URLs. Patterns and a blocklist of commonly cited frameworks live in `pdfbatch/links.py`.
 
 - **Links inside a References section are dropped**, because those are cited tools, not the paper's own code.
 - **Link checking:** `--check-links` HEAD-checks code links (results cached for 30 days).

@@ -7,9 +7,11 @@ from __future__ import annotations
 
 import hashlib
 import re
+import unicodedata
 from dataclasses import dataclass, field
+from functools import cached_property
 from pathlib import Path
-from typing import List, Optional, Tuple
+from typing import List, Optional
 
 import pymupdf  # PyMuPDF (AGPL); see README for the permissive alternative
 
@@ -18,13 +20,12 @@ import pymupdf  # PyMuPDF (AGPL); see README for the permissive alternative
 class PdfContent:
     path: Path
     sha256: str
-    n_pages: int
     info: dict                         # PDF Info dict (title, author, subject, keywords, …)
     xmp: str                           # raw XMP packet ('' if none)
     page_texts: List[str]              # text of every page
     header_footer_text: str            # page-1 text in top/bottom 12% bands + left/right margins
     title_guess: Optional[str]         # largest-font text on page 1
-    link_uris: List[Tuple[int, str]] = field(default_factory=list)   # (page_index, uri)
+    link_uris: List[str] = field(default_factory=list)   # http(s) link annotations
 
     @property
     def first_pages(self) -> str:
@@ -36,7 +37,20 @@ class PdfContent:
 
     @property
     def is_probably_scanned(self) -> bool:
-        return sum(len(t.strip()) for t in self.page_texts[:2]) < 40
+        return len(self.first_pages.strip()) < 40
+
+    @cached_property
+    def head(self) -> str:
+        """First three pages plus the Info title, normalised for fuzzy matching."""
+        return normalize("\n".join(self.page_texts[:3]) + " " + str(self.info.get("title", "")))
+
+
+def normalize(s: Optional[str]) -> str:
+    """Lower-case ASCII words: no accents, ligatures, hyphenated line breaks or punctuation."""
+    s = unicodedata.normalize("NFKD", s or "")
+    s = "".join(c for c in s if not unicodedata.combining(c)).lower()
+    s = re.sub(r"-\s*\n\s*", "", s)
+    return " ".join(re.sub(r"[^a-z0-9]+", " ", s).split())
 
 
 def sha256_file(path: Path) -> str:
@@ -58,16 +72,11 @@ def read_pdf(path: Path) -> PdfContent:
         page_texts = [p.get_text("text") for p in doc]
         hf = _header_footer_text(doc[0]) if doc.page_count else ""
         title = _title_guess(doc[0]) if doc.page_count else None
-        uris: List[Tuple[int, str]] = []
-        for i, page in enumerate(doc):
-            for ln in page.get_links():
-                uri = ln.get("uri")
-                if uri and uri.startswith(("http://", "https://")):
-                    uris.append((i, uri))
+        uris = [u for page in doc for ln in page.get_links()
+                if (u := ln.get("uri") or "").startswith(("http://", "https://"))]
         return PdfContent(
             path=path,
             sha256=sha256_file(path),
-            n_pages=doc.page_count,
             info=info,
             xmp=xmp,
             page_texts=page_texts,

@@ -6,10 +6,11 @@ import pytest
 
 from pdfbatch import apis
 from pdfbatch.identifiers import clean_doi, find_candidates
+from pdfbatch.links import classify
 from pdfbatch.pdf_reader import read_pdf
 from pdfbatch.pipeline import Settings, process_pdf
-from pdfbatch.record import Author
-from pdfbatch.writers import ris_entry, write_markdown
+from pdfbatch.record import Author, Record
+from pdfbatch.writers import apa, ris_entry, write_markdown
 
 from . import fixtures
 
@@ -36,7 +37,7 @@ def http(monkeypatch):
 
 
 def settings(**kw):
-    return Settings(mailto="test@example.org", **kw)
+    return Settings(**kw)
 
 
 # --------------------------------------------------------------------------- unit
@@ -56,6 +57,24 @@ def test_author_split():
     a = Author.from_display("Pieter van der Berg")
     assert (a.family, a.given) == ("van der Berg", "Pieter")
     assert Author.from_display("Doe, Jane").ris() == "Doe, Jane"
+
+
+def test_apa_authors():
+    r = Record(authors=[Author("Doe", "Jane Q."), Author(literal="Human Cell Atlas Consortium")], year="2024")
+    assert apa(r) == "Doe, J. Q., & Human Cell Atlas Consortium (2024)."
+
+
+@pytest.mark.parametrize("url, want", [
+    ("https://github.com/Org/Repo/tree/main/src?x=1", "https://github.com/Org/Repo"),
+    ("https://gitlab.com/a/b/c/repo/-/issues", "https://gitlab.com/a/b/c/repo"),
+    ("https://hf.co/datasets/org/set", "https://huggingface.co/datasets/org/set"),
+    ("https://zenodo.org/record/42", "https://doi.org/10.5281/zenodo.42"),
+    ("https://github.com/features/actions", None),          # site page, not a repo
+    ("https://example.org/a/b", None),
+])
+def test_classify(url, want):
+    f = classify(url)
+    assert (f.url if f else None) == want
 
 
 def test_header_doi_outranks_cited_doi(pdf_dir):

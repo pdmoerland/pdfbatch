@@ -6,14 +6,14 @@ CLI that turns a folder of PDFs into `<name>.md` + `<name>.ris` (EndNote/Zotero)
 
 | Where | What |
 |---|---|
-| `pdfbatch/cli.py` | Argument parsing, incremental (SHA-256) batching, thread pool, writes outputs. Entry point `pdf-batch`; `pdf_batch.py` is a checkout shim. |
+| `pdfbatch/cli.py` | Argument parsing, incremental (SHA-256) batching, thread pool, writes outputs. Entry point `pdf-batch`. |
 | `pdfbatch/pipeline.py` | `process_pdf`: identification tiers → API merge → validation/confidence → code & data links. |
 | `pdfbatch/pdf_reader.py` | PyMuPDF text, fonts, XMP, link annotations. |
 | `pdfbatch/identifiers.py` | DOI / arXiv candidate extraction (reference lists excluded). |
 | `pdfbatch/apis.py` | Cached, throttled clients: CrossRef, OpenAlex, Europe PMC, arXiv, Unpaywall, GROBID. |
 | `pdfbatch/llm.py` | Optional last-resort LLM (Anthropic / Ollama) that only produces a search key. |
-| `pdfbatch/link_patterns.py`, `link_labeler.py`, `link_validator.py` | Code/data URL patterns + blocklist, heuristic labels, HEAD-check with diskcache. |
-| `pdfbatch/record.py`, `writers.py`, `citation.py` | Data model; Markdown / RIS / JSON writers; APA author formatting. |
+| `pdfbatch/links.py` | Code/data platforms + blocklist, heuristic labels, cached HEAD-check, `find_links`. |
+| `pdfbatch/record.py`, `writers.py` | Data model; APA, Markdown, RIS and JSON writers. |
 
 ## Running
 

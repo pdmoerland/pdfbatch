@@ -2,7 +2,7 @@
 
 The main hazard is picking up a DOI from the reference list or a
 "see also" box, so position matters more than frequency. Every candidate is
-later checked against the PDF text (pipeline._validate) before it is accepted.
+later checked against the PDF text (pipeline.validate) before it is accepted.
 """
 
 from __future__ import annotations
@@ -78,7 +78,6 @@ def _xmp_dois(xmp: str) -> List[str]:
             out.extend(_dois_in(m.group(1)))
         for m in re.finditer(rf'{tag}="([^"]+)"', xmp, re.I):
             out.extend(_dois_in(m.group(1)))
-    # rdf:li inside dc:identifier
     return list(dict.fromkeys(out))
 
 
@@ -114,16 +113,15 @@ def find_candidates(pdf: PdfContent) -> List[Candidate]:
     for a in _arxiv_in(p1):
         add("arxiv", a, "page1", 0.75)
 
-    if pdf.n_pages > 1:
+    if len(pdf.page_texts) > 1:
         p2 = _before_references(pdf.page_texts[1])
         for i, d in enumerate(_dois_in(p2)[:3]):
             add("doi", d, "page2", 0.5 - 0.1 * i)
-    if pdf.n_pages > 2:
+    if len(pdf.page_texts) > 2:
         # Some publishers (e.g. older Elsevier, some OUP) print the DOI only at the end.
         last = pdf.page_texts[-1]
-        tail = last[-1500:]
         if not REFS_HEADING_RE.search(last):
-            for d in _dois_in(tail)[:2]:
+            for d in _dois_in(last[-1500:])[:2]:
                 add("doi", d, "last-page", 0.3)
 
     cands.sort(key=lambda c: c.score, reverse=True)

@@ -17,6 +17,7 @@ import xml.etree.ElementTree as ET
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
+import diskcache
 import requests
 
 from .record import Author, OpenAccess
@@ -33,14 +34,7 @@ class Http:
         self.ttl = ttl_days * 86400
         self.session = requests.Session()
         self.session.headers["User-Agent"] = f"pdfbatch/1.0 (mailto:{mailto})"
-        self.cache = None
-        if cache_dir:
-            try:
-                import diskcache
-                cache_dir.mkdir(parents=True, exist_ok=True)
-                self.cache = diskcache.Cache(str(cache_dir))
-            except ImportError:
-                pass
+        self.cache = diskcache.Cache(str(cache_dir)) if cache_dir else None
         self._last: Dict[str, float] = {}
 
     def _throttle(self, host: str, min_interval: float) -> None:
@@ -205,7 +199,7 @@ def crossref_to_fields(m: dict) -> dict:
         "keywords": m.get("subject") or [],
         "related_doi": related_doi,
         "related_relation": related_rel,
-        "_crossref_license": lic,
+        "_license": lic,
     }
 
 
@@ -253,7 +247,7 @@ def openalex_to_fields(w: dict) -> dict:
     date = w.get("publication_date")
     return {
         "title": w.get("title") or w.get("display_name"),
-        "authors": [a for a in authors if a.display()],
+        "authors": [a for a in authors if a.family or a.literal],
         "journal": src.get("display_name"),
         "issn": src.get("issn_l"),
         "date": date,

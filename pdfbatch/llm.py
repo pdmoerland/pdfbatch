@@ -64,16 +64,12 @@ class LlmIdentifier:
         self.calls = 0
 
     def identify(self, page1_text: str) -> Optional[dict]:
-        text = page1_text[:MAX_CHARS]
+        ask = {"anthropic": self._anthropic, "ollama": self._ollama}[self.backend]
         self.calls += 1
         try:
-            if self.backend == "anthropic":
-                return self._anthropic(text)
-            if self.backend == "ollama":
-                return self._ollama(text)
+            return ask(page1_text[:MAX_CHARS])
         except requests.RequestException:
             return None
-        raise ValueError(f"unknown LLM backend {self.backend!r}")
 
     def _anthropic(self, text: str) -> Optional[dict]:
         key = os.environ.get("ANTHROPIC_API_KEY")
