@@ -51,6 +51,28 @@ Running pdfbatch on a real reading list (`_PDM/Reader/Transcription factors`) le
 
 On the 58 PDFs, title guesses changed in 6. The thesis gets its real title first, two-word banners disappear, and one spaced author line is added as a harmless last guess. Resolution is unchanged for all 53 real PDFs.
 
+## Papers without a DOI
+
+Three *Cancer Research* papers from 2001–2003 (`_PDM/Reader/Markers`: `quakenbush_cancer.pdf`, `rogers_renal_cancer_seldi.pdf`, `wright_serum.pdf`) were unresolved. The journal registered no DOIs then, so CrossRef doesn't know them. OpenAlex and Europe PMC do.
+
+| Problem | Fix |
+|---|---|
+| The title guess ended in a superscript footnote marker (`… Microarray 1`). The stray digit alone made OpenAlex's search miss. | Title guesses leave out spans set below 70% of the line's largest size. |
+| OpenAlex's record has PubMed as its "source", so the journal became *PubMed*. | A repository source is not a journal. |
+| No DOI, so no link. | Link PubMed when there's a PMID. No OpenAlex links: they are not citation links. |
+| Enrichment ran only for DOIs. | Europe PMC is also queried by PMID, and also when the journal is missing. It now supplies journal, ISSN, volume, issue and pages, filling gaps only. |
+| NLM journal titles are in sentence case ("Cancer research"). | The journal name comes from the ISSN via OpenAlex sources ("Cancer Research"). |
+| PubMed-style abbreviated pages (`7792–7`). | One `_page_fields` helper for all three sources expands them, drops a last page equal to the first, and recognises article numbers written as pages (`Article5`, which Europe PMC uses too). |
+| An all-caps family name from OpenAlex (`EARLE-HUGHES`). | `Author.from_display` puts it in normal case. |
+
+Verified on 100 PDFs (both Reader folders and *GRN_inference*), comparing APA citations from the old and new code:
+- the three papers go from unresolved to high;
+- `ringner-bcr.pdf` gets `23–26` instead of `23–6`;
+- two ranges like `2869–2869` become `2869`;
+- nothing else changes.
+
+Overall: 87 high, 7 medium, 6 unresolved.
+
 ## Remaining unresolved in that folder
 
 - `thijs_thesis.pdf`: no CrossRef or OpenAlex record exists, so it stays unresolved, now with its correct title. Author and year must be added by hand.

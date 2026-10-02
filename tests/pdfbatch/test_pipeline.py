@@ -74,7 +74,27 @@ def test_apa_authors():
 ])
 def test_openalex_pages(first, last, want):
     f = apis.openalex_to_fields({"biblio": {"first_page": first, "last_page": last}})
-    assert (f["first_page"], f["last_page"], f["article_number"]) == want
+    assert (f["first_page"], f["last_page"], f.get("article_number")) == want
+
+
+@pytest.mark.parametrize("pages, want", [
+    ("7792-7", ("7792", "7797", None)),                   # PubMed-style abbreviated end
+    ("23-6", ("23", "26", None)),
+    ("2869-2869", ("2869", None, None)),
+    ("Article5", (None, None, "5")),                      # Europe PMC writes article numbers like this too
+])
+def test_page_range(pages, want):
+    f = apis._page_range(pages)
+    assert (f["first_page"], f["last_page"], f.get("article_number")) == want
+
+
+def test_paper_without_doi():
+    # PubMed-only OpenAlex records: PubMed is not the journal, and PubMed is the link.
+    f = apis.openalex_to_fields({"primary_location": {"source": {"display_name": "PubMed", "type": "repository"}},
+                                 "ids": {"pmid": "https://pubmed.ncbi.nlm.nih.gov/11691794"}})
+    assert f["journal"] is None and f["doi"] is None
+    assert f["url"] == "https://pubmed.ncbi.nlm.nih.gov/11691794/"
+    assert Author.from_display("J. A. EARLE-HUGHES").family == "Earle-Hughes"
 
 
 def test_apa_article_number():

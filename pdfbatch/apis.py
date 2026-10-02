@@ -128,6 +128,26 @@ def _norm_license(lic: Optional[str]) -> Optional[str]:
     return lic
 
 
+def _page_fields(first: Optional[str], last: Optional[str] = None) -> dict:
+    """Record page fields from a source's first and last page.
+
+    Sources disagree on notation: article numbers given as pages (OpenAlex and Europe PMC
+    write "Article5"), PubMed-style abbreviated ends (7792–7 for 7792–7797), and a last
+    page that repeats the first.
+    """
+    if article := re.fullmatch(r"article\s*(?:no\.?\s*)?(\S+)", first or "", re.I):
+        return {"first_page": None, "last_page": None, "article_number": article[1]}
+    if first and last and first.isdigit() and last.isdigit() and len(last) < len(first):
+        last = first[:len(first) - len(last)] + last
+    return {"first_page": first or None, "last_page": last if last and last != first else None}
+
+
+def _page_range(pages: Optional[str]) -> dict:
+    """`_page_fields` for a "first-last" string."""
+    first, _, last = (pages or "").replace("–", "-").partition("-")
+    return _page_fields(first, last)
+
+
 # ---------------------------------------------------------------------------
 # CrossRef
 # ---------------------------------------------------------------------------
@@ -152,8 +172,6 @@ def crossref_to_fields(m: dict) -> dict:
         date = _date_from_parts(m.get(k))
         if date:
             break
-    page = (m.get("page") or "").replace("–", "-")
-    first, _, last = page.partition("-")
     ctype = m.get("type") or "journal-article"
     is_preprint = ctype == "posted-content" and (m.get("subtype") in (None, "preprint"))
     journal = (m.get("container-title") or [None])[0]
@@ -189,9 +207,8 @@ def crossref_to_fields(m: dict) -> dict:
         "year": date[:4] if date else None,
         "volume": m.get("volume"),
         "issue": m.get("issue"),
-        "first_page": first or None,
-        "last_page": last or None,
         "article_number": m.get("article-number"),
+        **_page_range(m.get("page")),
         "issn": issn,
         "doi": (m.get("DOI") or "").lower() or None,
         "url": f"https://doi.org/{m['DOI']}" if m.get("DOI") else m.get("URL"),
@@ -238,6 +255,7 @@ def openalex_to_fields(w: dict) -> dict:
     authors = [Author.from_display((a.get("author") or {}).get("display_name") or "")
                for a in w.get("authorships") or []]
     src = ((w.get("primary_location") or {}).get("source") or {})
+    repository = src.get("type") == "repository"
     bib = w.get("biblio") or {}
     oa = w.get("open_access") or {}
     best = w.get("best_oa_location") or {}
@@ -245,22 +263,22 @@ def openalex_to_fields(w: dict) -> dict:
     pmid = (ids.get("pmid") or "").rsplit("/", 1)[-1] or None
     pmcid = (ids.get("pmcid") or "").rsplit("/", 1)[-1] or None
     date = w.get("publication_date")
-    first, last = bib.get("first_page"), bib.get("last_page")
-    # OpenAlex puts article numbers in the page fields: first = last = "Article5".
-    article = re.fullmatch(r"article\s*(?:no\.?\s*)?(\S+)", first or "", re.I)
+    doi = (w.get("doi") or "").replace("https://doi.org/", "").lower() or None
     return {
         "title": w.get("title") or w.get("display_name"),
         "authors": [a for a in authors if a.family or a.literal],
-        "journal": src.get("display_name"),
-        "issn": src.get("issn_l"),
+        # For PubMed-only records the "source" is PubMed itself, which is not a journal.
+        "journal": None if repository else src.get("display_name"),
+        "issn": None if repository else src.get("issn_l"),
         "date": date,
         "year": date[:4] if date else None,
         "volume": bib.get("volume"),
         "issue": bib.get("issue"),
-        "first_page": None if article else first,
-        "last_page": None if article or last == first else last,
-        "article_number": article and article[1],
-        "doi": (w.get("doi") or "").replace("https://doi.org/", "").lower() or None,
+        **_page_fields(bib.get("first_page"), bib.get("last_page")),
+        "doi": doi,
+        # Older papers often have no DOI (e.g. Cancer Research before ~2004): link PubMed instead.
+        "url": (f"https://doi.org/{doi}" if doi else
+                f"https://pubmed.ncbi.nlm.nih.gov/{pmid}/" if pmid else None),
         "abstract": _inverted_to_text(w.get("abstract_inverted_index")),
         "pmid": pmid,
         "pmcid": pmcid,
@@ -353,16 +371,32 @@ def arxiv_work(http: Http, arxiv_id: str) -> Optional[dict]:
 # Europe PMC (abstract + PMID/PMCID backfill for biomedical papers)
 # ---------------------------------------------------------------------------
 
-def europepmc(http: Http, doi: str) -> Optional[dict]:
+def europepmc(http: Http, doi: Optional[str] = None, pmid: Optional[str] = None) -> Optional[dict]:
+    """By DOI, or by PMID for papers without one (PubMed-indexed papers from before DOIs)."""
+    query = f'DOI:"{doi}"' if doi else f"EXT_ID:{pmid} AND SRC:MED"
     body = http.get("https://www.ebi.ac.uk/europepmc/webservices/rest/search",
-                    params={"query": f'DOI:"{doi}"', "resultType": "core", "format": "json", "pageSize": 1})
+                    params={"query": query, "resultType": "core", "format": "json", "pageSize": 1})
     try:
         r = body["resultList"]["result"][0]
     except (TypeError, KeyError, IndexError):
         return None
+    info = r.get("journalInfo") or {}
+    journal = info.get("journal") or {}
     return {
         "abstract": strip_markup(r.get("abstractText")),
         "pmid": r.get("pmid"),
         "pmcid": r.get("pmcid"),
         "keywords": (r.get("keywordList") or {}).get("keyword") or [],
+        "journal": journal.get("title"),       # NLM style ("Cancer research"); see journal_name
+        "issn": journal.get("issn") or journal.get("essn"),
+        "volume": info.get("volume"),
+        "issue": info.get("issue"),
+        **_page_range(r.get("pageInfo")),
     }
+
+
+def journal_name(http: Http, issn: str) -> Optional[str]:
+    """The journal's own name for an ISSN: 'Cancer Research', where NLM writes 'Cancer research'."""
+    body = http.get(f"https://api.openalex.org/sources/issn:{issn}",
+                    params={"mailto": http.mailto, "select": "display_name"})
+    return (body or {}).get("display_name")

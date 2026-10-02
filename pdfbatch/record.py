@@ -27,9 +27,11 @@ class Author:
         name = " ".join((name or "").split())
         if not name:
             return cls()
+        # Some sources write family names in capitals ("J. A. EARLE-HUGHES").
+        uncap = lambda fam: fam.title() if fam.isupper() and len(fam) > 2 else fam
         if "," in name:
             fam, giv = name.split(",", 1)
-            return cls(family=fam.strip(), given=giv.strip())
+            return cls(family=uncap(fam.strip()), given=giv.strip())
         parts = name.split(" ")
         if len(parts) == 1:
             return cls(literal=name)
@@ -38,7 +40,7 @@ class Author:
         i = len(parts) - 1
         while i > 1 and parts[i - 1].lower() in particles:
             i -= 1
-        return cls(family=" ".join(parts[i:]), given=" ".join(parts[:i]))
+        return cls(family=uncap(" ".join(parts[i:])), given=" ".join(parts[:i]))
 
 
 @dataclass

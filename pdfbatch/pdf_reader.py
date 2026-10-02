@@ -185,7 +185,9 @@ def _title_guesses(tp, rect) -> List[str]:
             if y0 > limit_y:
                 continue
             size = max(s["size"] for s in spans)
-            text = " ".join(s["text"].strip() for s in spans)
+            # Leave out superscripts (footnote markers, affiliation numbers): "Microarray¹" is not
+            # titled "Microarray 1", and the stray digit alone can make a title search miss.
+            text = " ".join(s["text"].strip() for s in spans if s["size"] >= 0.7 * size)
             lines.append((round(size, 1), y0, text))
     guesses = []
     for size in sorted({l[0] for l in lines}, reverse=True)[:3]:

@@ -236,22 +236,25 @@ def apply_version_policy(http: apis.Http, s: Settings, rec: Record) -> None:
 def enrich(http: apis.Http, s: Settings, pdf: PdfContent, rec: Record) -> None:
     # Abstract priority: CrossRef > Europe PMC (curated) > OpenAlex (rebuilt from an
     # inverted index, occasionally truncated) > PDF text.
-    if rec.doi:
+    # Papers without a DOI (often PubMed-indexed papers from before ~2004) are enriched by PMID.
+    if rec.doi or rec.pmid:
         oa_abstract = None
-        if "openalex" not in rec.resolved_via and (w := apis.openalex_work(http, rec.doi, s.openalex_api_key)):
+        if rec.doi and "openalex" not in rec.resolved_via and (w := apis.openalex_work(http, rec.doi, s.openalex_api_key)):
             oa_abstract = w.pop("abstract", None)
             _merge(rec, w)
             if w.get("oa") and not rec.oa.source:
                 rec.oa = w["oa"]
             rec.resolved_via.append("openalex")
-        if (not rec.abstract or not rec.pmid) and (ep := apis.europepmc(http, rec.doi)):
+        if (not rec.abstract or not rec.pmid or not rec.journal) and (ep := apis.europepmc(http, rec.doi, rec.pmid)):
             if ep["abstract"] and not rec.abstract:
                 rec.abstract_source = "europepmc"
+            if ep["issn"] and not rec.journal:
+                rec.journal = apis.journal_name(http, ep["issn"])     # else NLM's "Cancer research"
             _merge(rec, ep)
             rec.resolved_via.append("europepmc")
         if oa_abstract and not rec.abstract:
             rec.abstract, rec.abstract_source = oa_abstract, "openalex"
-        if s.unpaywall_email and (up := apis.unpaywall(http, rec.doi, s.unpaywall_email)) and up.status:
+        if rec.doi and s.unpaywall_email and (up := apis.unpaywall(http, rec.doi, s.unpaywall_email)) and up.status:
             up.license = up.license or rec.oa.license
             rec.oa = up
 
