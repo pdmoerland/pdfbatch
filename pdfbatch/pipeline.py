@@ -59,7 +59,7 @@ def _good(confidence: str) -> bool:
 def validate(f: dict, pdf: PdfContent) -> Tuple[str, float]:
     """Does the API record describe *this* PDF? → (confidence, title score)."""
     title = normalize(f.get("title"))
-    if not title:
+    if len(title.split()) < 3:                 # "32", "NCI & FDA": found in almost any text
         return "low", 0.0
     score = fuzz.partial_ratio(title, pdf.head) if pdf.head else 0.0
     surnames = (normalize(a.family or a.literal.split(" ")[-1]) for a in (f.get("authors") or [])[:5])
@@ -88,6 +88,17 @@ def _resolve(http: apis.Http, s: Settings, kind: str, value: str) -> Optional[di
     return f
 
 
+def _resembles(query: str, title: Optional[str]) -> bool:
+    """A search hit's title resembles the title searched for, and is not a mere fragment of it.
+
+    A hit titled after a phrase in the query ("Surface-Enhanced Laser Desorption/Ionization
+    Time of Flight Mass Spectrometry", an encyclopedia entry) shares its words but covers
+    too little of it. A longer hit is fine: OCR'd title guesses can be fragments themselves.
+    """
+    q, t = normalize(query), normalize(title)
+    return fuzz.token_set_ratio(q, t) >= 85 and len(t) >= 0.6 * len(q)
+
+
 def _title_search(http: apis.Http, s: Settings, pdf: PdfContent, title: str,
                   surname: Optional[str] = None) -> Tuple[Optional[dict], str]:
     """CrossRef, then OpenAlex: the best hit that resembles `title` and validates.
@@ -99,8 +110,7 @@ def _title_search(http: apis.Http, s: Settings, pdf: PdfContent, title: str,
     searches = (("crossref-search", lambda: apis.crossref_search(http, title, surname)),
                 ("openalex-search", lambda: apis.openalex_search(http, title, s.openalex_api_key)))
     for via, search in searches:
-        scored = [(validate(h, pdf), h) for h in search()
-                  if fuzz.token_set_ratio(normalize(title), normalize(h.get("title"))) >= 85]
+        scored = [(validate(h, pdf), h) for h in search() if _resembles(title, h.get("title"))]
         if scored:
             (conf, _), h = max(scored, key=lambda x: (_RANK[x[0][0]], x[0][1]))
             if _good(conf):
@@ -154,7 +164,8 @@ def _best_candidate(http: apis.Http, s: Settings, pdf: PdfContent) -> Optional[H
 
 def _fallbacks(http: apis.Http, s: Settings, pdf: PdfContent) -> Iterator[Hit]:
     """Tiers 3–5, cheapest first; generated lazily so later tiers run only when needed."""
-    for title in dict.fromkeys(t for t in (*pdf.title_guesses, pdf.info.get("title")) if t and len(t) >= 15):
+    queries = (*pdf.title_guesses, pdf.info.get("title"), pdf.opening)
+    for title in dict.fromkeys(t for t in queries if t and len(t) >= 15):
         yield (*_title_search(http, s, pdf, title), "title-search")
     if s.grobid_url and (g := _grobid(s, pdf.path)):
         f, conf, by = _lookup(http, s, pdf, g["doi"], g["title"])
@@ -203,7 +214,7 @@ def identify(http: apis.Http, s: Settings, pdf: PdfContent, rec: Record) -> None
                        re.split(r";|\band\b|,(?=\s*[A-Z][a-z]+\s+[A-Z])", pdf.info["author"]) if a.strip()]
     rec.notes.append("No identifier could be resolved; only PDF-derived fields are present.")
     if pdf.is_probably_scanned:
-        rec.notes.append("PDF has (almost) no text layer — install Tesseract for automatic OCR "
+        rec.notes.append("PDF has no usable text layer — install Tesseract for automatic OCR "
                          "of page 1, or run ocrmypdf on the file, and retry with --force.")
 
 
@@ -284,7 +295,7 @@ def process_pdf(path: Path, http: apis.Http, s: Settings) -> Record:
         return rec
     rec.pdf_sha256 = pdf.sha256
     if pdf.ocr:
-        rec.notes.append("Scanned PDF: page 1 was read by OCR.")
+        rec.notes.append("No usable text layer: page 1 was read by OCR.")
     identify(http, s, pdf, rec)
     apply_version_policy(http, s, rec)
     enrich(http, s, pdf, rec)

@@ -10,8 +10,8 @@ import pytest
 from pdfbatch import apis, pdf_reader
 from pdfbatch.identifiers import clean_doi, find_candidates
 from pdfbatch.links import classify
-from pdfbatch.pdf_reader import read_pdf
-from pdfbatch.pipeline import Settings, process_pdf
+from pdfbatch.pdf_reader import read_pdf, unreadable
+from pdfbatch.pipeline import Settings, _resembles, process_pdf, validate
 from pdfbatch.record import Author, Record
 from pdfbatch.writers import apa, ris_entry, write_markdown
 
@@ -202,7 +202,7 @@ def test_scan_is_read_by_ocr(scan, http, monkeypatch):
     monkeypatch.setattr(pdf_reader, "_ocr", lambda page: text_page.get_textpage(flags=pymupdf.TEXTFLAGS_TEXT))
     r = process_pdf(path, http, settings())
     assert r.doi == "10.1105/tpc.23.00001" and r.confidence == "high"
-    assert "Scanned PDF: page 1 was read by OCR." in r.notes
+    assert "No usable text layer: page 1 was read by OCR." in r.notes
 
 
 def test_tessdata_outside_path(tmp_path, monkeypatch):
@@ -257,6 +257,33 @@ def test_all_caps_title_page(tmp_path, http):
     r = process_pdf(tmp_path / "thesis.pdf", http, settings())
     assert r.confidence == "unresolved"
     assert r.title == "Probabilistic methods to search for regulatory elements"
+
+
+def test_search_hit_must_not_be_a_fragment():
+    # An encyclopedia entry named after a method in the title shares its words but is not the paper.
+    query = ("Normal, Benign, Preneoplastic, and Malignant Prostate Cells Have Distinct Protein Expression "
+             "Profiles Resolved by Surface Enhanced Laser Desorption/Ionization Mass Spectrometry")
+    assert not _resembles(query, "Surface-Enhanced Laser Desorption/Ionization Time of Flight Mass Spectrometry")
+    assert _resembles(query, query.upper())
+    assert _resembles("unaligned noncoding sequences clustered",          # an OCR fragment may be shorter
+                      "Finding DNA regulatory motifs within unaligned noncoding sequences clustered")
+
+
+def test_short_titles_cannot_validate(pdf_dir):
+    pdf = read_pdf(pdf_dir / "doe2024_zebrafish.pdf")
+    assert validate({"title": "Abstract", "authors": [Author("Doe", "Jane")]}, pdf)[0] == "low"
+    assert validate({"title": "NCI & FDA"}, pdf)[0] == "low"
+
+
+def test_unreadable_text_layer():
+    assert unreadable("")                                                 # a scan
+    assert unreadable("\x00\x02\x01\x04\x03\x06 " * 20 + "readable words " * 20)   # font without a character map
+    assert not unreadable("An ordinary page of text, long enough to count as a text layer.")
+
+
+def test_opening_lines(pdf_dir):
+    assert read_pdf(pdf_dir / "scan_0042.pdf").opening == \
+        "Phase separation of transcription factors in plant immunity"
 
 
 def test_title_search_falls_back_to_openalex(pdf_dir, http, monkeypatch):

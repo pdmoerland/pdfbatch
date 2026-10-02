@@ -45,7 +45,15 @@ class PdfContent:
 
     @property
     def is_probably_scanned(self) -> bool:
-        return len(self.first_pages.strip()) < 40
+        return not self.page_texts or unreadable(self.page_texts[0])
+
+    @property
+    def opening(self) -> Optional[str]:
+        """The first two substantial lines of page 1, joined: in reading order the title usually
+        comes first. A last-resort search query for when font sizes mislead, as they do in OCR
+        output, where sizes are estimated from the scanned glyphs."""
+        lines = [" ".join(l.split()) for l in (self.page_texts[0] if self.page_texts else "").splitlines()]
+        return " ".join([l for l in lines if len(l) >= 15][:2]) or None
 
     @cached_property
     def head(self) -> str:
@@ -59,6 +67,13 @@ def normalize(s: Optional[str]) -> str:
     s = "".join(c for c in s if not unicodedata.combining(c)).lower()
     s = re.sub(r"-\s*\n\s*", "", s)
     return " ".join(re.sub(r"[^a-z0-9]+", " ", s).split())
+
+
+def unreadable(text: str) -> bool:
+    """No usable text layer: (almost) no text, as in a scan, or text in a font without a
+    character map, which comes out as control characters (NUL, STX, SOH, …)."""
+    chars = "".join(text.split())
+    return len(chars) < 40 or sum(ord(c) < 32 for c in chars) > 0.01 * len(chars)
 
 
 def sha256_file(path: Path) -> str:
@@ -82,7 +97,7 @@ def read_pdf(path: Path) -> PdfContent:
         if doc.page_count:
             page = doc[0]
             tp = page.get_textpage(flags=pymupdf.TEXTFLAGS_TEXT)
-            if len(page_texts[0].strip()) < 40 and (ocr_tp := _ocr(page)):
+            if unreadable(page_texts[0]) and (ocr_tp := _ocr(page)):
                 tp, ocr = ocr_tp, True
                 page_texts[0] = tp.extractText()
             hf = _header_footer_text(tp, page.rect)

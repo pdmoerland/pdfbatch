@@ -92,7 +92,10 @@ Every API hit is checked against the PDF text before it is accepted (`validate`)
 - **Accepted:** `medium` and above.
 - **Low-confidence fallback:** if nothing better turns up, a `low` hit is kept, with a note saying so.
 - **Review flag:** `low` and `unresolved` records are listed under "Needs review" in Markdown and tagged `pdfbatch: needs review` in RIS, so you can filter them in your reference manager.
-- **Title-search guard:** search hits must also resemble the query (`token_set_ratio` ≥ 85) before they are validated. This stops a search for a short, generic title from wandering off.
+- **Title-search guard:** search hits must also resemble the query (`token_set_ratio` ≥ 85) and must not be a mere fragment of it: the hit's title needs at least 60% of the query's length. Otherwise an encyclopedia entry named after a method in the title ("Surface-Enhanced Laser Desorption/Ionization…") shares the words without being the paper. A *longer* hit is fine, because OCR'd queries can be fragments themselves.
+- **Short titles prove nothing:** an API title of fewer than three words ("32", "NCI & FDA") occurs in almost any text, so it can never validate a match; it gives `low` at most.
+- **Garbled text is no text:** a page 1 whose text is more than 1% control characters comes from a font without a character map (common in older LaTeX PDFs). It is OCR'd like a scan.
+- **Last query, the opening lines:** after the font-based title guesses and the Info title, the first two substantial lines of page 1 are searched. In reading order the title usually comes first, and this rescues PDFs whose font sizes mislead, OCR output in particular.
 
 **Why.** Without validation, the first DOI on page 1 is often a reference ("Earlier atlases (doi:…) lacked …"). One cheap fuzzy match catches this.
 

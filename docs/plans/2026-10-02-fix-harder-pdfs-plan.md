@@ -73,6 +73,28 @@ Verified on 100 PDFs (both Reader folders and *GRN_inference*), comparing APA ci
 
 Overall: 87 high, 7 medium, 6 unresolved.
 
+## Wrong matches at medium confidence
+
+Comparing citations across 100 PDFs showed three records that were confidently wrong. They were accepted at `medium`, so they didn't appear under Needs review, which is worse than unresolved.
+
+| PDF | Wrong match | Why it got through |
+|---|---|---|
+| `cazares_seldi.pdf` | *Encyclopedia of Cancer* entry "Surface-Enhanced Laser Desorption/Ionization Time of Flight Mass Spectrometry" | The phrase is in the paper's abstract, so the title scored 100. With no authors to contradict it, that gave medium, and OpenAlex was never asked. |
+| `baggerly_prodcon.pdf` | *Oncology Times* item "NCI & FDA" | A two-word title is found in almost any text. |
+| `freitas_shrink.pdf` | Book chapter "32" | The PDF's text layer is garbage (a font without a character map), and it contains a "32". |
+
+Measured on the 51 title-search hits: every correct hit's title is at least 97% as long as the query, or longer (OCR fragments). The wrong ones are at 18%, 33% and 45%. Page-1 control characters: 300 in `freitas_shrink.pdf`, 0 in the 99 others.
+
+Fixes:
+- Search hits must cover at least 60% of the query's length (`_resembles`).
+- A title of fewer than three words cannot validate.
+- Page 1 counts as unreadable when more than 1% of it is control characters, and is OCR'd (`unreadable`).
+- The opening lines of page 1 are searched last (`PdfContent.opening`), because OCR'd font sizes mislead.
+
+Result: Cazares → high, the real paper (via OpenAlex). Freitas → high, AISTATS 2003 (OCR, then the opening lines, then OpenAlex). Baggerly → medium, the published version in *Cancer Informatics* 2005 under a revised title. No other record changed. Overall: 89 high, 5 medium, 6 unresolved.
+
+Known data issue: OpenAlex lists the AISTATS authors as Gustafson, Carbonetto, Thompson, de Freitas; the paper has Carbonetto, de Freitas, Gustafson, Thompson. Author order is taken from the source as is.
+
 ## Remaining unresolved in that folder
 
 - `thijs_thesis.pdf`: no CrossRef or OpenAlex record exists, so it stays unresolved, now with its correct title. Author and year must be added by hand.
