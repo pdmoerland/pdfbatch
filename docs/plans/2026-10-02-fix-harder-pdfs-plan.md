@@ -1,0 +1,50 @@
+---
+title: Harder PDFs — review records, title banners and scans
+type: fix
+status: completed
+date: 2026-10-02
+iteration: 5
+---
+
+# Iteration 5 — Harder PDFs
+
+## Overview
+
+Running pdfbatch on a real reading list (`_PDM/Reader/Transcription factors`) left some PDFs unresolved. Three of them each exposed a different gap, and each fix is general rather than a special case for one file.
+
+| PDF | Symptom | Root cause | Fix | Commit |
+|---|---|---|---|---|
+| `berman_pnas02.pdf` (PNAS 2002) | unresolved | Footer DOI mangled by the font encoding (`orgcgidoi10.1073pnas…`). The title search then stopped at CrossRef, whose top 5 hits were all *"Faculty Opinions recommendation of …"* records, rightly rejected by validation. | Ask OpenAlex whenever CrossRef has no hit that **validates**, not only when it returns nothing. | `75f8ef1` |
+| `keles_motif.pdf` (Berkeley working paper 2003) | unresolved | The largest text on page 1 is the series banner, not the title, so only the banner was searched. | Keep one title guess per font size (three largest) and search each until one validates. | `84f9cba` |
+| ″ | `Article5–Article5` in the citation | OpenAlex encodes article numbers as first = last page = `"Article5"`. | Turn them into `article_number`; drop a last page equal to the first; APA writes "Article 5". | `84f9cba` |
+| `liu_motif.pdf` (JSTOR scan, 1995) | unresolved | Image-only PDF: no text layer at all. | OCR page 1 when Tesseract is installed. | OCR fallback |
+
+## OCR fallback
+
+- **When:** page 1 has fewer than 40 characters of text. Only page 1 is read: it has the title, authors and, on JSTOR cover pages, a full citation. That is enough to identify the paper, and one page takes a second or two rather than a minute.
+- **How:** `page.get_textpage_ocr(language="eng", dpi=300, full=True)` in PyMuPDF. It needs Tesseract installed and raises `RuntimeError` when it isn't; `_ocr` then returns `None` and nothing else changes.
+- **One code path:** page-1 analysis (text, header/footer bands, title guesses) now works on a PyMuPDF *TextPage*, either the page's own or the OCR one. This replaced `page.get_text(…, clip=…)` with `TextPage.extractTextbox(…)` for the bands.
+- **Notes on the record:**
+  - with OCR: "Scanned PDF: page 1 was read by OCR."
+  - without Tesseract: what to install, and to rerun with `--force`. The record is cached by hash, so a plain rerun would skip it.
+- **No new options.** OCR switches itself on once Tesseract is present.
+
+## Verification
+
+- **Page-1 extraction**, before vs after the TextPage refactor, on 58 PDFs (5 fixtures, 44 in *Transcription factors*, 9 in *GRN_inference*):
+  - Page text and title guesses: identical.
+  - Header/footer bands: differ only at band edges. `extractTextbox` also takes characters that cross a band's edge, and keeps hyphens.
+  - DOIs and arXiv IDs found in the bands: identical, except SCENIC+, whose header DOI is now found directly.
+- **Full pipeline, old vs new reader**, on the 53 real PDFs: the same confidence, DOI and route for every one (48 high, 2 medium, 3 unresolved).
+- **Tests:** 30 pass.
+  - Berman: CrossRef returns only a review record and OpenAlex has the paper.
+  - Keles: a banner set larger than the title.
+  - Three OpenAlex page cases and an APA article number.
+  - A scan read by "OCR". The test substitutes the textpage of the page the scan was rendered from, because tests cannot assume Tesseract.
+  - A scan without Tesseract.
+- **Not verified here:** real Tesseract output. Tesseract was not installed on the development machine.
+
+## Remaining unresolved in that folder
+
+- `liu_motif.pdf` until Tesseract is installed.
+- `Roth_AlignAce.pdf` and `thijs_thesis.pdf`: not yet investigated.

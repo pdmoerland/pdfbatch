@@ -68,6 +68,8 @@ Text after a References heading is never searched, and a DOI seen in several pla
 
 **The title guess** joins the lines set in the largest font in the top 60% of page 1, keeping the first vertically contiguous run. The result must be 15–350 characters and must not look like a journal banner or "Research article". It is cheap and good enough for journal PDFs; GROBID and the LLM catch the rest.
 
+**Scans.** A PDF whose page 1 has (almost) no text is OCR'd, page 1 only, when Tesseract is installed (`_ocr` in [`pdf_reader.py`](pdfbatch/pdf_reader.py), via PyMuPDF, English, 300 dpi). Page 1 carries what identification needs: title, authors and often a citation block (JSTOR cover pages), and one page costs a second or two rather than a minute. The OCR text then goes through the same tiers and the same validation as any other text, and the record notes that OCR was used. Without Tesseract nothing breaks: the PDF is flagged with what to install. Page 1 is analysed from a PyMuPDF *TextPage* — the page's own or the OCR one — so both paths share one code path.
+
 **Laziness is structural.** Tiers 3–5 are a generator, and `identify` takes the first good hit with `next(...)`. So a GROBID server or an LLM is never contacted for a PDF that a cheaper tier already identified.
 
 ---
@@ -271,3 +273,4 @@ Principles applied in [iteration 4](docs/plans/2026-10-02-refactor-minimal-elega
 | 2 | [Standalone tool](docs/plans/2026-10-02-refactor-standalone-pdfbatch-plan.md) | `ec51861` |
 | 3 | [Leaner Markdown output](docs/plans/2026-10-02-feat-simplify-markdown-output-plan.md) | `844ac08`, `3d9e172` |
 | 4 | [Minimal, elegant code](docs/plans/2026-10-02-refactor-minimal-elegant-code-plan.md) | `df2dcc4` |
+| 5 | [Harder PDFs: review records, banners, scans](docs/plans/2026-10-02-fix-harder-pdfs-plan.md) | `75f8ef1`, `84f9cba`, then the OCR-fallback commit |

@@ -201,7 +201,8 @@ def identify(http: apis.Http, s: Settings, pdf: PdfContent, rec: Record) -> None
                        re.split(r";|\band\b|,(?=\s*[A-Z][a-z]+\s+[A-Z])", pdf.info["author"]) if a.strip()]
     rec.notes.append("No identifier could be resolved; only PDF-derived fields are present.")
     if pdf.is_probably_scanned:
-        rec.notes.append("PDF has (almost) no text layer — run OCR (e.g. ocrmypdf) and retry.")
+        rec.notes.append("PDF has (almost) no text layer — install Tesseract for automatic OCR "
+                         "of page 1, or run ocrmypdf on the file, and retry with --force.")
 
 
 # ---------------------------------------------------------------------------
@@ -277,6 +278,8 @@ def process_pdf(path: Path, http: apis.Http, s: Settings) -> Record:
         rec.notes.append(f"Could not open PDF: {e}")
         return rec
     rec.pdf_sha256 = pdf.sha256
+    if pdf.ocr:
+        rec.notes.append("Scanned PDF: page 1 was read by OCR.")
     identify(http, s, pdf, rec)
     apply_version_policy(http, s, rec)
     enrich(http, s, pdf, rec)

@@ -26,6 +26,7 @@ class PdfContent:
     header_footer_text: str            # page-1 text in top/bottom 12% bands + left/right margins
     title_guesses: List[str]           # large-font text runs on page 1, largest first
     link_uris: List[str] = field(default_factory=list)   # http(s) link annotations
+    ocr: bool = False                  # page-1 text came from OCR (scan without a text layer)
 
     @property
     def title_guess(self) -> Optional[str]:
@@ -74,8 +75,15 @@ def read_pdf(path: Path) -> PdfContent:
         except Exception:                      # noqa: BLE001
             xmp = ""
         page_texts = [p.get_text("text") for p in doc]
-        hf = _header_footer_text(doc[0]) if doc.page_count else ""
-        titles = _title_guesses(doc[0]) if doc.page_count else []
+        hf, titles, ocr = "", [], False
+        if doc.page_count:
+            page = doc[0]
+            tp = page.get_textpage(flags=pymupdf.TEXTFLAGS_TEXT)
+            if len(page_texts[0].strip()) < 40 and (ocr_tp := _ocr(page)):
+                tp, ocr = ocr_tp, True
+                page_texts[0] = tp.extractText()
+            hf = _header_footer_text(tp, page.rect)
+            titles = _title_guesses(tp, page.rect)
         uris = [u for page in doc for ln in page.get_links()
                 if (u := ln.get("uri") or "").startswith(("http://", "https://"))]
         return PdfContent(
@@ -87,22 +95,34 @@ def read_pdf(path: Path) -> PdfContent:
             header_footer_text=hf,
             title_guesses=titles,
             link_uris=uris,
+            ocr=ocr,
         )
     finally:
         doc.close()
 
 
-def _header_footer_text(page) -> str:
+def _ocr(page) -> Optional["pymupdf.TextPage"]:
+    """Page text by OCR, for scans without a text layer; None when Tesseract is not installed.
+
+    Only page 1 is read: it carries the title, authors and often a citation block
+    (JSTOR cover pages), which is all identification needs.
+    """
+    try:
+        return page.get_textpage_ocr(flags=pymupdf.TEXTFLAGS_TEXT, language="eng", dpi=300, full=True)
+    except RuntimeError:                       # "Tesseract is not installed"
+        return None
+
+
+def _header_footer_text(tp, r) -> str:
     """Text in the bands where publishers print the article's own DOI
     (running header/footer, arXiv's left-margin stamp)."""
-    r = page.rect
     bands = [
         pymupdf.Rect(r.x0, r.y0, r.x1, r.y0 + r.height * 0.12),
         pymupdf.Rect(r.x0, r.y1 - r.height * 0.12, r.x1, r.y1),
         pymupdf.Rect(r.x0, r.y0, r.x0 + r.width * 0.08, r.y1),
         pymupdf.Rect(r.x1 - r.width * 0.08, r.y0, r.x1, r.y1),
     ]
-    return "\n".join(page.get_text("text", clip=b) for b in bands)
+    return "\n".join(tp.extractTextbox(b) for b in bands)
 
 
 _TITLE_JUNK = re.compile(
@@ -112,15 +132,15 @@ _TITLE_JUNK = re.compile(
 )
 
 
-def _title_guesses(page) -> List[str]:
+def _title_guesses(tp, rect) -> List[str]:
     """Runs of lines set in the three largest fonts in the top 60% of page 1, largest first.
 
     Usually the first is the title. Not always: a series banner ("… Working Paper
     Series") can be set larger, so later runs are kept too and the title search
     tries each in turn; validation rejects the wrong ones.
     """
-    d = page.get_text("dict")
-    limit_y = page.rect.y0 + page.rect.height * 0.6
+    d = tp.extractDICT()
+    limit_y = rect.y0 + rect.height * 0.6
     lines = []  # (size, y0, text)
     for block in d.get("blocks", []):
         for line in block.get("lines", []):

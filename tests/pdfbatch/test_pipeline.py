@@ -5,7 +5,7 @@ from pathlib import Path
 import pymupdf
 import pytest
 
-from pdfbatch import apis
+from pdfbatch import apis, pdf_reader
 from pdfbatch.identifiers import clean_doi, find_candidates
 from pdfbatch.links import classify
 from pdfbatch.pdf_reader import read_pdf
@@ -158,6 +158,35 @@ def test_title_below_a_larger_banner(tmp_path, http):
     doc.save(tmp_path / "working_paper.pdf"); doc.close()
     r = process_pdf(tmp_path / "working_paper.pdf", http, settings())
     assert r.doi == "10.1105/tpc.23.00001" and r.confidence == "high"
+
+
+@pytest.fixture
+def scan(tmp_path):
+    """An image-only PDF of a title page, plus the text page it was rendered from."""
+    text = pymupdf.open()
+    fixtures._page(text, [(50, 100, "Phase separation of transcription factors", 19),
+                          (50, 125, "in plant immunity", 19),
+                          (50, 160, "Anna Jansen and Bram de Vries", 11)])
+    doc = pymupdf.open()
+    doc.new_page(width=595, height=842).insert_image(pymupdf.Rect(0, 0, 595, 842),
+                                                      pixmap=text[0].get_pixmap(dpi=100))
+    doc.save(tmp_path / "scan.pdf"); doc.close()
+    yield tmp_path / "scan.pdf", text[0]
+    text.close()
+
+
+def test_scan_is_read_by_ocr(scan, http, monkeypatch):
+    path, text_page = scan        # stands in for Tesseract, which tests cannot assume
+    monkeypatch.setattr(pdf_reader, "_ocr", lambda page: text_page.get_textpage(flags=pymupdf.TEXTFLAGS_TEXT))
+    r = process_pdf(path, http, settings())
+    assert r.doi == "10.1105/tpc.23.00001" and r.confidence == "high"
+    assert "Scanned PDF: page 1 was read by OCR." in r.notes
+
+
+def test_scan_without_tesseract(scan, http, monkeypatch):
+    monkeypatch.setattr(pdf_reader, "_ocr", lambda page: None)
+    r = process_pdf(scan[0], http, settings())
+    assert r.confidence == "unresolved" and any("install Tesseract" in n for n in r.notes)
 
 
 def test_title_search_falls_back_to_openalex(pdf_dir, http, monkeypatch):
