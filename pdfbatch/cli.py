@@ -66,6 +66,8 @@ def main(argv=None) -> int:
     src = args.input_dir.expanduser()
     if not src.is_dir():
         log(f"Not a folder: {str(src)!r}")    # repr shows stray control characters
+        if '"' in str(src):                    # Windows reads `\"` as a literal quote
+            log('Hint: remove the backslash before the closing quote ("...\\folder", not "...\\folder\\").')
         return 1
     src = src.resolve()
     out = (args.out or src / "_metadata").expanduser().resolve()
