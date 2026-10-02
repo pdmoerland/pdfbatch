@@ -5,10 +5,12 @@
 ## Install and run
 
 ```bash
-uv venv && uv pip install -e '.[dev]'
+uv sync --extra dev
 uv run pdf-batch ~/papers --mailto you@uni.nl --unpaywall
 # → ~/papers/_metadata/papers.md, papers.ris, papers.json
 ```
+
+`uv sync` creates `.venv` if needed and installs the locked dependencies, so it is safe to rerun. The commands work the same in bash, PowerShell and cmd.
 
 `CONTACT_MAILTO` in a `.env` file (searched from the current directory upwards; see `.env.example`) works instead of `--mailto`. Reruns are incremental: PDFs are keyed by SHA-256, so only new files are processed and renamed files are recognised. Use `--force` to redo everything.
 
