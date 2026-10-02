@@ -95,6 +95,24 @@ Result: Cazares → high, the real paper (via OpenAlex). Freitas → high, AISTA
 
 Known data issue: OpenAlex lists the AISTATS authors as Gustafson, Carbonetto, Thompson, de Freitas; the paper has Carbonetto, de Freitas, Gustafson, Thompson. Author order is taken from the source as is.
 
+## Title-only matches
+
+`benner_modelsel.pdf` is a slide deck titled "Model Assessment and Selection". The title search matched it to the chapter of that name in Hastie, Tibshirani & Friedman's *Elements of Statistical Learning*. The title was perfect and no author was found, which gave medium, so it was accepted.
+
+Of all 100 PDFs, four accepted records had no author confirmed. Two of those were caused by a bug:
+
+| PDF | Before | Cause | Now |
+|---|---|---|---|
+| `segal_imaging.pdf`, `segal_modules.pdf` | medium | Author check bug: affiliation numbers stick to names (`Segal1`), and `segal` has no word boundary between `l` and `1`. | high |
+| `benner_modelsel.pdf` | medium: Hastie et al. chapter | A search hit accepted on its title alone. | unresolved (a presentation) |
+| `srinivas_proteomics.pdf` | medium: Zhang (2011), "Proteomics *in* Cancer Biomarker Discovery" | The same. | high: Srinivas et al. (2002), *Clin Chem*, the real paper |
+
+Fixes:
+- Author names are matched with letters-only boundaries.
+- Search hits need at least one author found in the PDF (`validate(..., need_author=True)`). DOI hits keep the old rule, because a DOI printed in the PDF is evidence in itself.
+
+Overall: 92 high, 1 medium (Baggerly, the published version under a revised title), 7 unresolved.
+
 ## Remaining unresolved in that folder
 
 - `thijs_thesis.pdf`: no CrossRef or OpenAlex record exists, so it stays unresolved, now with its correct title. Author and year must be added by hand.

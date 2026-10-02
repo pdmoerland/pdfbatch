@@ -56,17 +56,23 @@ def _good(confidence: str) -> bool:
     return _RANK[confidence] >= _RANK["medium"]
 
 
-def validate(f: dict, pdf: PdfContent) -> Tuple[str, float]:
-    """Does the API record describe *this* PDF? → (confidence, title score)."""
+def validate(f: dict, pdf: PdfContent, *, need_author: bool = False) -> Tuple[str, float]:
+    """Does the API record describe *this* PDF? → (confidence, title score).
+
+    With `need_author`, a matching title alone is not enough. Use it for search hits:
+    a generic title ("Model Assessment and Selection") belongs to many works, while a
+    DOI printed in the PDF is evidence in itself.
+    """
     title = normalize(f.get("title"))
     if len(title.split()) < 3:                 # "32", "NCI & FDA": found in almost any text
         return "low", 0.0
     score = fuzz.partial_ratio(title, pdf.head) if pdf.head else 0.0
     surnames = (normalize(a.family or a.literal.split(" ")[-1]) for a in (f.get("authors") or [])[:5])
-    named = any(len(s) > 1 and re.search(rf"\b{re.escape(s)}\b", pdf.head) for s in surnames)
+    # Letters-only boundaries: affiliation numbers stick to names in the text ("segal1").
+    named = any(len(s) > 1 and re.search(rf"(?<![a-z]){re.escape(s)}(?![a-z])", pdf.head) for s in surnames)
     if score >= 90 and named:
         return "high", score
-    if score >= 90 or (score >= 75 and named):
+    if (score >= 90 and not need_author) or (score >= 75 and named):
         return "medium", score
     return "low", score
 
@@ -110,7 +116,7 @@ def _title_search(http: apis.Http, s: Settings, pdf: PdfContent, title: str,
     searches = (("crossref-search", lambda: apis.crossref_search(http, title, surname)),
                 ("openalex-search", lambda: apis.openalex_search(http, title, s.openalex_api_key)))
     for via, search in searches:
-        scored = [(validate(h, pdf), h) for h in search() if _resembles(title, h.get("title"))]
+        scored = [(validate(h, pdf, need_author=True), h) for h in search() if _resembles(title, h.get("title"))]
         if scored:
             (conf, _), h = max(scored, key=lambda x: (_RANK[x[0][0]], x[0][1]))
             if _good(conf):

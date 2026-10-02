@@ -10,7 +10,7 @@ import pytest
 from pdfbatch import apis, pdf_reader
 from pdfbatch.identifiers import clean_doi, find_candidates
 from pdfbatch.links import classify
-from pdfbatch.pdf_reader import read_pdf, unreadable
+from pdfbatch.pdf_reader import PdfContent, read_pdf, unreadable
 from pdfbatch.pipeline import Settings, _resembles, process_pdf, validate
 from pdfbatch.record import Author, Record
 from pdfbatch.writers import apa, ris_entry, write_markdown
@@ -273,6 +273,25 @@ def test_short_titles_cannot_validate(pdf_dir):
     pdf = read_pdf(pdf_dir / "doe2024_zebrafish.pdf")
     assert validate({"title": "Abstract", "authors": [Author("Doe", "Jane")]}, pdf)[0] == "low"
     assert validate({"title": "NCI & FDA"}, pdf)[0] == "low"
+
+
+def _pdf_with_text(text):
+    return PdfContent(path=Path("x.pdf"), sha256="", info={}, xmp="", page_texts=[text],
+                      header_footer_text="", title_guesses=[])
+
+
+def test_authors_with_affiliation_numbers():
+    pdf = _pdf_with_text("Module networks: identifying regulatory modules\nEran Segal1,6, Michael Shapira2")
+    f = {"title": "Module networks: identifying regulatory modules", "authors": [Author("Segal", "Eran")]}
+    assert validate(f, pdf)[0] == "high"
+
+
+def test_search_hits_need_an_author():
+    # Slides titled like a textbook chapter: the title alone proves nothing for a search hit.
+    pdf = _pdf_with_text("Model Assessment\nand\nSelection\nAxel Benner\nBiostatistics, German Cancer Research Center")
+    chapter = {"title": "Model Assessment and Selection", "authors": [Author("Hastie", "Trevor")]}
+    assert validate(chapter, pdf)[0] == "medium"                  # fine when the PDF printed this DOI
+    assert validate(chapter, pdf, need_author=True)[0] == "low"
 
 
 def test_unreadable_text_layer():
