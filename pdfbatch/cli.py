@@ -63,7 +63,11 @@ def main(argv=None) -> int:
     args = _arguments(argv)
     log = lambda msg: print(msg, file=sys.stderr)
 
-    src = args.input_dir.expanduser().resolve()
+    src = args.input_dir.expanduser()
+    if not src.is_dir():
+        log(f"Not a folder: {str(src)!r}")    # repr shows stray control characters
+        return 1
+    src = src.resolve()
     out = (args.out or src / "_metadata").expanduser().resolve()
     out.mkdir(parents=True, exist_ok=True)
     pdfs = sorted(p for p in (src.rglob("*") if args.recursive else src.iterdir())
