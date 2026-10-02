@@ -155,7 +155,7 @@ CrossRef's `is-preprint-of` / `has-preprint` relations and arXiv's `<arxiv:doi>`
 
 [`links.py`](pdfbatch/links.py) finds the paper's *own* code and data:
 
-1. **Sources:** the full text, plus the PDF's link annotations. Annotations survive line-wrapped URLs; the text is also repaired by re-joining URLs broken at line ends.
+1. **Sources:** the full text, plus the PDF's link annotations. Annotations survive line-wrapped URLs; the text is also repaired by re-joining URLs broken at line ends. Where the text has only a cut-off prefix of an annotated URL, for example when a preprint's margin line number splits it (`…/STARN` · `1472` · `et`), the annotation wins and the prefix is dropped.
 2. **Recognised platforms:** GitHub, GitLab, Bitbucket, Codeberg (code); Hugging Face, Zenodo, figshare, Dryad, OSF, Synapse (data). Each URL is canonicalised. For example, `github.com/org/repo/tree/main/src` becomes `github.com/org/repo`, and `zenodo.org/records/N` becomes its DOI.
 3. **Site pages:** reserved first path segments (`github.com/features`, `huggingface.co/docs`) are rejected as site pages.
 4. **Cited tools:** **links inside a References section are dropped.** That section runs from the heading to the next Methods, Data availability, Acknowledgements, … heading.

@@ -246,7 +246,13 @@ def find_links(pdf: PdfContent, checker: Optional[LinkChecker] = None) -> List[L
         cited = i >= 0 and any(a <= i < b for a, b in refs)       # a cited tool, not the paper's own
         return not cited and f.url.lower() not in BLOCKLIST and (checker is None or checker.alive(f))
 
-    found = [f for f in _first_per_url(extract(text) + extract("\n".join(pdf.link_uris))) if own(f)]
+    # A URL broken across lines (in preprints, around a margin line number) leaves a prefix of
+    # the hyperlink behind it in the text: ".../STARN" for ".../STARNet". The link annotation
+    # is the authoritative form; a text URL that only prefixes an annotated one is dropped.
+    annotated = extract("\n".join(pdf.link_uris))
+    hyperlinks = {f.url for f in annotated}
+    in_text = [f for f in extract(text) if f.url in hyperlinks or not any(u.startswith(f.url) for u in hyperlinks)]
+    found = [f for f in _first_per_url(in_text + annotated) if own(f)]
     label = labels(text, found)
     seen = Counter()
     out = []

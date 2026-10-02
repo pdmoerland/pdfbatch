@@ -9,7 +9,7 @@ import pytest
 
 from pdfbatch import apis, pdf_reader
 from pdfbatch.identifiers import clean_doi, find_candidates
-from pdfbatch.links import classify
+from pdfbatch.links import classify, find_links
 from pdfbatch.pdf_reader import PdfContent, read_pdf, unreadable
 from pdfbatch.pipeline import Settings, _name_in, _resembles, process_pdf, validate
 from pdfbatch.record import Author, Record
@@ -309,6 +309,14 @@ def test_search_hits_need_all_authors_spelled_nearly_right():
     # Short names must match exactly: "Then" is not "Chen".
     assert not _name_in(_pdf_with_text("then and there"), "chen")
     assert not _name_in(_pdf_with_text("developmental stages"), "states")
+
+
+def test_url_cut_by_a_line_number():
+    # bioRxiv line numbers split the URL in the text; the hyperlink annotation is whole.
+    pdf = PdfContent(path=Path("x.pdf"), sha256="", info={}, xmp="", header_footer_text="", title_guesses=[],
+                     page_texts=["The source code is available at https://github.com/DBinary/STARN\n1472\net."],
+                     link_uris=["https://github.com/DBinary/STARNet"])
+    assert [l.url for l in find_links(pdf)] == ["https://github.com/DBinary/STARNet"]
 
 
 def test_unreadable_text_layer():
