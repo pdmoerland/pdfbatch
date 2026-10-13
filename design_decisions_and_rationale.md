@@ -119,6 +119,7 @@ The LLM tier is off by default ([`llm.py`](pdfbatch/llm.py)).
 ## Enrichment and field precedence
 
 - **Merge rule:** the record that identified the paper is merged with *override*. Later sources only fill fields that are still empty (`_merge`).
+- **Same version only:** OpenAlex merges a preprint and its published version into one work, so looked up by a bioRxiv DOI it can return the journal article (`10.1101/2022.02.20.481171` → `10.1093/bib/bbac245`). Its volume, issue, ISSN, PMID and OA data belong to the other version. An OpenAlex record is therefore used only if its DOI is the DOI asked for.
 - **Abstract priority:** CrossRef → Europe PMC (curated) → OpenAlex (rebuilt from an inverted index, occasionally truncated) → a slice of the PDF's own page 1–2 text. The winner is recorded in `abstract_source` in the JSON.
 - **Europe PMC** is queried only when the abstract or PMID is still missing. It adds PMID, PMCID and keywords for biomedical papers.
 - **CrossRef licences** (version-of-record or unspecified) fill the OA licence when the OA sources don't give one.

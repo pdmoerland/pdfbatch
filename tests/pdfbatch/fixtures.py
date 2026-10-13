@@ -149,7 +149,7 @@ CR_B_PUB = {"message": {
     "container-title": ["Bioinformatics"], "published-online": {"date-parts": [[2024, 5, 10]]},
     "volume": "40", "issue": "5", "article-number": "btae100", "publisher": "Oxford University Press",
 }}
-OA_B_PUB = {"open_access": {"is_oa": True, "oa_status": "gold", "oa_url": "https://academic.oup.com/x.pdf"},
+OA_B_PUB = {"doi": "https://doi.org/10.1093/bioinformatics/btae100", "open_access": {"is_oa": True, "oa_status": "gold", "oa_url": "https://academic.oup.com/x.pdf"},
             "best_oa_location": {"license": "cc-by", "version": "publishedVersion"}}
 
 CR_SEARCH_C = {"message": {"items": [
@@ -160,7 +160,7 @@ CR_SEARCH_C = {"message": {"items": [
      "author": [{"given": "Anna", "family": "Jansen"}, {"given": "Bram", "family": "de Vries"}],
      "container-title": ["The Plant Cell"], "published-print": {"date-parts": [[2023, 11]]},
      "volume": "35", "issue": "11", "page": "4001-4019"}]}}
-OA_C = {"open_access": {"is_oa": False, "oa_status": "closed", "oa_url": None}, "best_oa_location": None}
+OA_C = {"doi": "https://doi.org/10.1105/tpc.23.00001", "open_access": {"is_oa": False, "oa_status": "closed", "oa_url": None}, "best_oa_location": None}
 
 CR_D = {"message": {
     "DOI": "10.1101/2024.03.15.585123", "type": "posted-content", "subtype": "preprint",

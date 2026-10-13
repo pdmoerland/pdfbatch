@@ -88,6 +88,16 @@ def test_page_range(pages, want):
     assert (f["first_page"], f["last_page"], f.get("article_number")) == want
 
 
+def test_openalex_record_of_another_version_is_ignored():
+    # Asked for a bioRxiv DOI, OpenAlex can answer with the merged journal article.
+    class Merged:
+        mailto = "t@example.org"
+        def get(self, url, params=None, **kw):
+            return {"doi": "https://doi.org/10.1093/bib/bbac245", "biblio": {"volume": "23", "issue": "4"}}
+    assert apis.openalex_work(Merged(), "10.1101/2022.02.20.481171") is None
+    assert apis.openalex_work(Merged(), "10.1093/BIB/bbac245")["volume"] == "23"
+
+
 def test_paper_without_doi():
     # PubMed-only OpenAlex records: PubMed is not the journal, and PubMed is the link.
     f = apis.openalex_to_fields({"primary_location": {"source": {"display_name": "PubMed", "type": "repository"}},

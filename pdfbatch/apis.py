@@ -232,9 +232,16 @@ def _openalex_params(http: Http, api_key: Optional[str]) -> dict:
 
 
 def openalex_work(http: Http, doi: str, api_key: Optional[str] = None) -> Optional[dict]:
+    """The OpenAlex record of exactly this DOI, or None.
+
+    OpenAlex merges a preprint and its published version into one work: looked up by the
+    preprint's DOI it can return the journal article's record, whose volume, issue, PMID
+    and OA status belong to another version.
+    """
     body = http.get(f"https://api.openalex.org/works/doi:{urllib.parse.quote(doi, safe='/')}",
                     params=_openalex_params(http, api_key))
-    return openalex_to_fields(body) if body else None
+    fields = openalex_to_fields(body) if body else None
+    return fields if fields and fields["doi"] == doi.lower() else None
 
 
 def openalex_to_fields(w: dict) -> dict:
