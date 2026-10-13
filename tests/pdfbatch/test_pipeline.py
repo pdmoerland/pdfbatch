@@ -329,6 +329,27 @@ def test_url_cut_by_a_line_number():
     assert [l.url for l in find_links(pdf)] == ["https://github.com/DBinary/STARNet"]
 
 
+def _links_in(text, uris=()):
+    return [l.url for l in find_links(PdfContent(path=Path("x.pdf"), sha256="", info={}, xmp="", header_footer_text="",
+                                                 title_guesses=[], page_texts=[text], link_uris=list(uris)))]
+
+
+def test_only_links_the_paper_offers_as_its_own():
+    text = ("Table 1. Methods compared\nAdRoit No R https://github.com/TaoYang-dev/AdRoit [16]\n"
+            "Data were downloaded from https://github.com/aertslab/cisTopic and processed.\n"
+            "Code availability. Our package is available at https://github.com/gao-lab/GLUE and "
+            "deposited in Zenodo at https://doi.org/10.5281/zenodo.7857017.")
+    assert _links_in(text) == ["https://github.com/gao-lab/GLUE", "https://doi.org/10.5281/zenodo.7857017"]
+    assert _links_in("Availability and implementation: https://github.com/lyrrrr/SVGRN") == \
+        ["https://github.com/lyrrrr/SVGRN"]
+
+
+def test_line_break_repair_stops_at_sentence_ends():
+    text = ("GLUE is publicly accessible at https://github.com/gao-lab/GLUE.\nResults\n"
+            "The demo is available at https://github.\ncom/gao-lab/GLUE-demo for the community.")
+    assert _links_in(text) == ["https://github.com/gao-lab/GLUE", "https://github.com/gao-lab/GLUE-demo"]
+
+
 def test_unreadable_text_layer():
     assert unreadable("")                                                 # a scan
     assert unreadable("\x00\x02\x01\x04\x03\x06 " * 20 + "readable words " * 20)   # font without a character map

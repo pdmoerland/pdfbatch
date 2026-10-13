@@ -226,6 +226,27 @@ class LinkChecker:
 # the paper's own links
 # ---------------------------------------------------------------------------
 
+# What a sentence says about a URL right before it: the paper offers it ("is available at",
+# "deposited in Zenodo at") or uses someone else's ("downloaded from", "based on").
+_STATEMENT = re.compile(
+    r"\b(?P<claim>availability|available|accessible|deposited|archived|released|hosted|"
+    r"can be (?:found|accessed|downloaded|obtained))\b"
+    r"|\b(?:(?:downloaded|obtained|retrieved|taken|adapted) from|provided (?:at|by|in)|based on|implemented in)\b",
+    re.I)
+_TAG_BEFORE = re.compile(r"\b(?:%s)\s*[:\-–]\s*<?$" % "|".join(map(re.escape, _TAGS)), re.I)
+
+
+def _claimed(text: str, i: int, window: int = 300) -> bool:
+    """The paper offers the link at `i` as its own: in the URL's own sentence, the statement
+    nearest to it says "available at" or "deposited at", not "downloaded from", or a tag
+    precedes it ("Code: https://…"). Tools a paper merely cites or compares, in tables or
+    in passing, make no such claim (Chen et al.'s table of benchmarked methods)."""
+    before = text[max(0, i - window):i]
+    sentence = before[max((m.end() for m in re.finditer(r"[.!?]\s|\n\s*\n", before)), default=0):]
+    statements = list(_STATEMENT.finditer(sentence))
+    return bool(_TAG_BEFORE.search(sentence) or statements and statements[-1]["claim"])
+
+
 _AFTER_REFS = re.compile(
     r"^\s*(?:\d+\.?\s*)?(methods|online methods|materials and methods|data availability|"
     r"code availability|data and code availability|resource availability|acknowledg(?:e)?ments?|"
@@ -236,22 +257,33 @@ _AFTER_REFS = re.compile(
 
 
 def find_links(pdf: PdfContent, checker: Optional[LinkChecker] = None) -> List[Link]:
-    # Re-join URLs broken at line ends ("https://github.com/org/\nrepo").
-    text = re.sub(r"(https?://[^\s]*[/\-_.])\n(?=[A-Za-z0-9])", r"\1", pdf.full_text)
+    # Drop zero-width spaces, which some publishers put inside printed URLs as break points
+    # ("https://​zenodo.​org/…"), and re-join URLs broken at line ends: after / - _
+    # ("…/org/\nrepo"), and after a dot only when the next line goes on in lower case
+    # ("github.\ncom"). A capital after a dot starts a new sentence or heading: "…/GLUE.\nResults".
+    text = re.sub(r"[​-‍⁠﻿]", "", pdf.full_text)
+    text = re.sub(r"(https?://\S*(?:[/\-_](?=\n[A-Za-z0-9])|\.(?=\n[a-z0-9])))\n", r"\1", text)
     refs = [(m.start(), (n.start() if (n := _AFTER_REFS.search(text, m.end())) else len(text)))
             for m in REFS_HEADING_RE.finditer(text)]
 
-    def own(f: Found) -> bool:
-        i = _position(text, f)
-        cited = i >= 0 and any(a <= i < b for a, b in refs)       # a cited tool, not the paper's own
-        return not cited and f.url.lower() not in BLOCKLIST and (checker is None or checker.alive(f))
-
     # A URL broken across lines (in preprints, around a margin line number) leaves a prefix of
     # the hyperlink behind it in the text: ".../STARN" for ".../STARNet". The link annotation
-    # is the authoritative form; a text URL that only prefixes an annotated one is dropped.
-    annotated = extract("\n".join(pdf.link_uris))
+    # is the authoritative form; a text URL that only prefixes an annotated one is dropped,
+    # but its place in the text still locates the hyperlink.
+    in_text, annotated = extract(text), extract("\n".join(pdf.link_uris))
     hyperlinks = {f.url for f in annotated}
-    in_text = [f for f in extract(text) if f.url in hyperlinks or not any(u.startswith(f.url) for u in hyperlinks)]
+    where = {f.url: _position(text, f) for f in in_text}
+    for f in annotated:
+        if where.get(f.url, -1) < 0:
+            where[f.url] = next((where[g.url] for g in in_text if f.url.startswith(g.url)), -1)
+
+    def own(f: Found) -> bool:
+        i = where[f.url]
+        cited = any(a <= i < b for a, b in refs)                  # in the reference list
+        return (i >= 0 and not cited and _claimed(text, i) and f.url.lower() not in BLOCKLIST
+                and (checker is None or checker.alive(f)))
+
+    in_text = [f for f in in_text if f.url in hyperlinks or not any(u.startswith(f.url) for u in hyperlinks)]
     found = [f for f in _first_per_url(in_text + annotated) if own(f)]
     label = labels(text, found)
     seen = Counter()

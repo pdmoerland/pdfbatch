@@ -50,7 +50,7 @@ A `closed` paper whose PDF you hold came through a subscription, so don't redist
 
 Code and data links are found in the PDF full text plus its link annotations, which survive line-wrapped URLs. Patterns and a blocklist of commonly cited frameworks live in `pdfbatch/links.py`.
 
-- **Links inside a References section are dropped**, because those are cited tools, not the paper's own code.
+- **Only links the paper offers as its own are listed:** their sentence must say they are available, accessible, deposited or archived ("Code is available at …"), or a tag must precede them ("Code: …"). Tools the paper compares, uses or cites, in tables, in passing or in its References, are left out.
 - **Link checking:** `--check-links` HEAD-checks code links (results cached for 30 days).
 
 ## Preprints
