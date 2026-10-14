@@ -25,7 +25,8 @@ from .writers import read_json, write_json, write_markdown, write_ris
 
 
 def _arguments(argv) -> argparse.Namespace:
-    ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    ap = argparse.ArgumentParser(prog="pdf-batch", description=__doc__,
+                                 formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("input_dir", type=Path)
     ap.add_argument("--out", type=Path, help="output dir (default: <input_dir>/_metadata)")
     ap.add_argument("--name", default="papers", help="base name of output files (default: papers)")

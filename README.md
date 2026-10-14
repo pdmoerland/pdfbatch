@@ -76,9 +76,15 @@ By default the record describes the version you hold, with the other version's D
 
 | Option | Purpose |
 |---|---|
-| `--openalex-key` (env `OPENALEX_API_KEY`) | Use your own OpenAlex API key |
-| `--workers 4` | Number of PDFs processed in parallel. APIs are throttled per host and cached for 30 days in `.pdfbatch_cache/` |
+| `--out DIR` | Output folder (default: `<input>/_metadata`) |
+| `--name NAME` | Base name of the output files (default: `papers`) |
 | `--recursive` | Include subfolders |
+| `--openalex-key` (env `OPENALEX_API_KEY`) | Use your own OpenAlex API key |
+| `--llm-model`, `--ollama-url` (env `OLLAMA_URL`) | Model and server for the `--llm` tier (defaults: `claude-haiku-4-5`, `qwen3:8b` at `http://localhost:11434`) |
+| `--workers 4` | Number of PDFs processed in parallel. APIs are throttled per host |
+| `--cache-dir DIR` | Where API responses and link checks are cached for 30 days (default: `.pdfbatch_cache/` in the current folder) |
+
+Run `pdf-batch --help` for the full list.
 
 ## Limits
 

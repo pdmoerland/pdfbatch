@@ -49,7 +49,7 @@ Each tier runs only when the previous one produced nothing that validates ([`ide
 |---|---|---|
 | 1 | XMP (`prism:doi`, `dc:identifier`, …) and the PDF Info dict | 0 |
 | 2 | DOI / arXiv regex by position: page-1 header/footer and margins → page 1 → page 2 → tail of the last page | 0 |
-| 3 | Largest-font title on page 1 (then the Info title) → CrossRef `query.bibliographic` → OpenAlex search | 0 tokens |
+| 3 | Title guesses (the three largest fonts on page 1, then the Info title, then the opening lines) → CrossRef `query.bibliographic` → OpenAlex search | 0 tokens |
 | 4 | GROBID header parse (`--grobid URL`), then DOI or title lookup | 0 tokens |
 | 5 | LLM search key from page 1 (`--llm anthropic\|ollama`) | ~1.5k tokens, rare |
 
@@ -279,4 +279,5 @@ Principles applied in [iteration 4](docs/plans/2026-10-02-refactor-minimal-elega
 | 3 | [Leaner Markdown output](docs/plans/2026-10-02-feat-simplify-markdown-output-plan.md) | `844ac08`, `3d9e172` |
 | 4 | [Minimal, elegant code](docs/plans/2026-10-02-refactor-minimal-elegant-code-plan.md) | `df2dcc4` |
 | 5 | [Harder PDFs: review records, banners, scans](docs/plans/2026-10-02-fix-harder-pdfs-plan.md) | `75f8ef1` … `a17cf74` |
-| 6 | [Specificity over sensitivity](docs/plans/2026-10-02-refactor-specificity-plan.md) | this refactor |
+| 6 | [Specificity over sensitivity](docs/plans/2026-10-02-refactor-specificity-plan.md) | `4e42d8a` |
+| 7 | [The right version, and only the paper's own links](docs/plans/2026-10-13-fix-versions-and-own-links-plan.md) | `92042ef`, `2671d54`, `60cfd1b` |
