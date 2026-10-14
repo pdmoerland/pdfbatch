@@ -3,6 +3,8 @@ name = "pdfbatch"
 version = "0.1.0"
 description = "Batch a folder of PDFs into Markdown + RIS (EndNote/Zotero) + JSON metadata, DOI-first"
 readme = "README.md"
+license = "AGPL-3.0-or-later"
+license-files = ["LICENSE"]
 requires-python = ">=3.11"
 dependencies = [
     "requests>=2.31.0",

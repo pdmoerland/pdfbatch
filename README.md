@@ -111,3 +111,7 @@ The tests generate synthetic PDFs and mock the APIs with real response shapes, s
 ## Design and history
 
 Why pdfbatch works the way it does is explained in [design_decisions_and_rationale.md](design_decisions_and_rationale.md). Each implementation iteration is summarised in [docs/plans/](docs/plans/).
+
+## License
+
+pdfbatch is free software, licensed under the [GNU Affero General Public License v3.0 or later](LICENSE) (`AGPL-3.0-or-later`). This matches its PDF library, PyMuPDF, which is also AGPL-licensed.
