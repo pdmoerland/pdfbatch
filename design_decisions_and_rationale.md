@@ -290,4 +290,4 @@ Principles applied in [iteration 4](docs/plans/2026-10-02-refactor-minimal-elega
 | 5 | [Harder PDFs: review records, banners, scans](docs/plans/2026-10-02-fix-harder-pdfs-plan.md) | `75f8ef1` … `a17cf74` |
 | 6 | [Specificity over sensitivity](docs/plans/2026-10-02-refactor-specificity-plan.md) | `4e42d8a` |
 | 7 | [The right version, and only the paper's own links](docs/plans/2026-10-13-fix-versions-and-own-links-plan.md) | `92042ef`, `2671d54`, `60cfd1b` |
-| 8 | [Your own notes](docs/plans/2026-10-14-feat-user-notes-plan.md) | the notes commit |
+| 8 | [Your own notes](docs/plans/2026-10-14-feat-user-notes-plan.md) | `b385031` |
