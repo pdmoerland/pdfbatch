@@ -21,7 +21,7 @@ from .llm import LlmIdentifier
 from .pdf_reader import sha256_file
 from .pipeline import Settings, process_pdf
 from .record import Record
-from .writers import read_json, write_json, write_markdown, write_ris
+from .writers import read_json, read_notes, write_json, write_markdown, write_ris
 
 
 def _arguments(argv) -> argparse.Namespace:
@@ -120,6 +120,15 @@ def main(argv=None) -> int:
     if llm and llm.calls:
         usage = f"LLM fallback used for {llm.calls} PDF(s): {llm.tokens_in} input + {llm.tokens_out} output tokens."
         log(usage)
+
+    # Your notes, from <out>/notes.md, refreshed on every run: a note deleted there disappears here.
+    notes = read_notes(out / "notes.md")
+    unmatched = {n.casefold(): n for n in notes}       # file names compare case-insensitively
+    for r in records:
+        name = unmatched.pop(Path(r.pdf_path).name.casefold(), None)
+        r.user_notes = notes[name] if name else None
+    for name in unmatched.values():
+        log(f"notes.md: no PDF named {name!r} (renamed, or a typo?)")
 
     write_json(records, json_path)
     write_markdown(records, out / f"{args.name}.md", llm_usage=usage)

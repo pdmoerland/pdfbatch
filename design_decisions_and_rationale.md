@@ -199,6 +199,7 @@ An overview for humans, kept deliberately lean:
 - per paper:
   - the **File** line first, because the file is what you have in hand;
   - the APA 7 citation;
+  - your own notes, if any (see below);
   - DOI and other IDs;
   - an open-access line in plain text, with no emoji, since those render as boxes in some viewers;
   - code and data links;
@@ -206,6 +207,14 @@ An overview for humans, kept deliberately lean:
   - any warnings.
 
 There is no summary table, no title heading, no separate author list and no abstract. The citation already carries title and authors.
+
+### Your notes: a file you own
+
+Notes about a paper live in `notes.md` beside the outputs, one `## <file name>` heading per paper. pdfbatch reads it on every run and never writes it. Every output file is pdfbatch's to regenerate (`papers.md` and `papers.ris` on every run, `papers.json` with `--force`), so a note kept in any of them would sooner or later be overwritten. A file the user owns separates the two cleanly.
+
+- **Keyed by file name**, which is what you see and type; renamed PDFs are recognised by hash, but their notes need the new name. A note that matches no PDF is reported, so a rename or a typo can't silently orphan it.
+- **Refreshed on every run** into `Record.user_notes`: the JSON shows the current notes, and a note deleted from `notes.md` disappears from the output.
+- **Separate from pdfbatch's warnings:** in Markdown a *Notes* block under the citation, in RIS an `N1` of its own (Zotero imports each `N1` as a separate note).
 
 ### APA formatting
 
@@ -281,3 +290,4 @@ Principles applied in [iteration 4](docs/plans/2026-10-02-refactor-minimal-elega
 | 5 | [Harder PDFs: review records, banners, scans](docs/plans/2026-10-02-fix-harder-pdfs-plan.md) | `75f8ef1` … `a17cf74` |
 | 6 | [Specificity over sensitivity](docs/plans/2026-10-02-refactor-specificity-plan.md) | `4e42d8a` |
 | 7 | [The right version, and only the paper's own links](docs/plans/2026-10-13-fix-versions-and-own-links-plan.md) | `92042ef`, `2671d54`, `60cfd1b` |
+| 8 | [Your own notes](docs/plans/2026-10-14-feat-user-notes-plan.md) | the notes commit |

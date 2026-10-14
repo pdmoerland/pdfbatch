@@ -57,6 +57,20 @@ Code and data links are found in the PDF full text plus its link annotations, wh
 
 By default the record describes the version you hold, with the other version's DOI noted. `--prefer published` cites the published version instead when CrossRef or arXiv links one.
 
+## Your own notes
+
+Keep notes about papers in `notes.md` next to the output files (`<input>/_metadata/notes.md`): one `## <file name>` heading per paper, then anything you like, including lists and `###` subheadings.
+
+```markdown
+## Chen-2022-biorxiv.pdf
+Good benchmark of deconvolution methods; RCTD and cell2location come out best.
+
+## doe2024_zebrafish.pdf
+Compare their enhancer grammar with our Fig. 3.
+```
+
+Every run puts each note under the paper's citation in `papers.md`, and in `papers.ris` as a separate note (`N1`), which EndNote and Zotero import with the reference. pdfbatch only reads `notes.md`, so your notes are never overwritten, not even with `--force`, and deleting a note there removes it from the output. File names match regardless of case; a note for a file name that isn't in the folder is reported, which catches typos and renamed PDFs.
+
 ## RIS details
 
 - **Fields:**

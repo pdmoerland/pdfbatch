@@ -7,13 +7,13 @@ from pathlib import Path
 import pymupdf
 import pytest
 
-from pdfbatch import apis, pdf_reader
+from pdfbatch import apis, cli, pdf_reader
 from pdfbatch.identifiers import clean_doi, find_candidates
 from pdfbatch.links import classify, find_links
 from pdfbatch.pdf_reader import PdfContent, read_pdf, unreadable
 from pdfbatch.pipeline import Settings, _name_in, _resembles, process_pdf, validate
 from pdfbatch.record import Author, Record
-from pdfbatch.writers import apa, ris_entry, write_markdown
+from pdfbatch.writers import apa, read_notes, ris_entry, write_markdown
 
 from . import fixtures
 
@@ -406,3 +406,32 @@ def test_ris_and_markdown(pdf_dir, http, tmp_path):
     assert "**Open access:** hybrid" in text and "🟠" not in text
     assert "Abstract" not in text
     assert "*Nature Methods*, *21*(6), 1012–1024." in text
+
+
+# --------------------------------------------------------------------------- your notes
+
+def test_read_notes(tmp_path):
+    (tmp_path / "notes.md").write_text(
+        "My reading notes\n\n## `doe2024_zebrafish.pdf`\nCompare with our Fig. 3.\n\n### Methods\n- ATAC + MERFISH\n\n"
+        "## protocol.pdf\n\n## scan_0042.pdf\nPlants!\n", encoding="utf-8")
+    assert read_notes(tmp_path / "notes.md") == {
+        "doe2024_zebrafish.pdf": "Compare with our Fig. 3.\n\n### Methods\n- ATAC + MERFISH",
+        "scan_0042.pdf": "Plants!"}                                  # empty notes and preamble ignored
+    assert read_notes(tmp_path / "missing.md") == {}
+
+
+def test_notes_survive_reruns(pdf_dir, http, tmp_path, capsys):
+    out = tmp_path / "out"; out.mkdir()
+    notes = out / "notes.md"
+    notes.write_text("## DOE2024_ZEBRAFISH.pdf\nKey reference for the atlas.\n\n## gone.pdf\nOld note.\n",
+                     encoding="utf-8")
+    run = lambda *extra: cli.main([str(pdf_dir), "--out", str(out), "--mailto", "t@example.org",
+                                   "--cache-dir", str(tmp_path / "cache"), *extra])
+    assert run("--force") == 0
+    md, ris = (out / "papers.md").read_text(encoding="utf-8"), (out / "papers.ris").read_bytes().decode("utf-8")
+    assert "**Notes:**\n\nKey reference for the atlas." in md                 # file names match in any case
+    assert "N1  - Key reference for the atlas.\r\n" in ris                  # a note of its own in RIS
+    assert "no PDF named 'gone.pdf'" in capsys.readouterr().err
+    notes.write_text("", encoding="utf-8")                                    # deleting a note removes it
+    assert run() == 0
+    assert "Key reference" not in (out / "papers.md").read_text(encoding="utf-8")

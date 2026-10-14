@@ -69,6 +69,7 @@ class Record:
     resolved_via: List[str] = field(default_factory=list)   # e.g. ['xmp-doi', 'crossref', 'openalex']
     confidence: str = "unresolved"      # high | medium | unresolved
     notes: List[str] = field(default_factory=list)          # human-readable warnings
+    user_notes: Optional[str] = None    # yours, from notes.md; refreshed on every run
 
     # bibliographic
     item_type: Optional[str] = None     # CrossRef vocabulary

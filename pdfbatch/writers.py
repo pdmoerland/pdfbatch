@@ -6,7 +6,7 @@ import datetime as dt
 import json
 import re
 from pathlib import Path
-from typing import Iterable, List
+from typing import Dict, Iterable, List
 
 from .record import Author, Record
 
@@ -147,6 +147,7 @@ def ris_entry(r: Record, *, preprint_type: str = "JOUR", attach: str = "uri") ->
     notes += [f"{l.kind.capitalize()}{f' ({l.label})' if l.label else ''}: {l.url}" for l in r.links]
     notes += r.notes
     notes.append(f"pdfbatch: {r.confidence} confidence via {' > '.join(r.resolved_via)}")
+    add("N1", r.user_notes)                    # yours as a note of its own (Zotero: a separate note)
     add("N1", " | ".join(notes))
 
     if r.pdf_path and attach != "none":
@@ -169,6 +170,8 @@ def write_ris(records: Iterable[Record], path: Path, *, preprint_type: str = "JO
 def _md_entry(r: Record) -> List[str]:
     pdf = Path(r.pdf_path)
     out = [f"**File:** [`{pdf.name}`]({pdf.as_uri()})", "", f"> {apa(r)}", ""]
+    if r.user_notes:
+        out += ["**Notes:**", "", r.user_notes, ""]
     if r.doi:
         out.append(f"**DOI:** [{r.doi}](https://doi.org/{r.doi})  ")
     ids = [x for x in (r.arxiv_id and f"arXiv:{r.arxiv_id}", r.pmid and f"PMID {r.pmid}", r.pmcid) if x]
@@ -220,3 +223,24 @@ def read_json(path: Path) -> List[Record]:
         return [Record.from_dict(d) for d in json.loads(path.read_text(encoding="utf-8"))]
     except (ValueError, TypeError):
         return []
+
+
+# ---------------------------------------------------------------------------
+# Your notes
+# ---------------------------------------------------------------------------
+
+def read_notes(path: Path) -> Dict[str, str]:
+    """`{pdf file name: note}` from a Markdown file you keep yourself: one `## <file name>`
+    heading per paper, then free text (deeper headings and lists included). pdfbatch only
+    reads it, so notes survive every run, `--force` included."""
+    if not path.exists():
+        return {}
+    notes: Dict[str, List[str]] = {}
+    name = None
+    for line in path.read_text(encoding="utf-8").splitlines():
+        if m := re.match(r"##\s+(.+?)\s*$", line):          # "###" and deeper stay part of the note
+            name = m[1].strip("`")
+            notes.setdefault(name, [])
+        elif name:
+            notes[name].append(line)
+    return {n: text for n, lines in notes.items() if (text := "\n".join(lines).strip())}
