@@ -39,7 +39,7 @@ Two places still accepted records the PDF did not confirm:
 
 ## Verification
 
-- **Your library:** all 100 PDFs (both Reader folders and *GRN_inference*), full records before and after. Confidence, APA and RIS are identical for every PDF apart from the reworded note: 92 high, 1 medium, 7 unresolved. Every accepted match was already confirmed by title and authors, so the stricter rule costs nothing here.
+- **Your library:** all 100 PDFs (two reading lists and a project literature folder), full records before and after. Confidence, APA and RIS are identical for every PDF apart from the reworded note: 92 high, 1 medium, 7 unresolved. Every accepted match was already confirmed by title and authors, so the stricter rule costs nothing here.
 - **Fixtures:** Markdown, RIS and JSON under three settings (default, `--unpaywall`, `--prefer published`). The differences are the reworded note and `item_type: null` for the unresolved fixture.
 - **Title guesses:** identical on 58 PDFs after the `_title_guesses` rewrite.
 - **Tests:** 45 pass. `test_a_title_alone_confirms_nothing` replaces the test that asserted the old title-only `medium`.

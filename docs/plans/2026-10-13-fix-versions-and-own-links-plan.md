@@ -53,7 +53,7 @@ Chen's links came from Table 1, the methods it compares: each row has a tool's U
 
 ## Verification
 
-All 102 PDFs (both Reader folders, *GRN_inference*, `Downloads\papers`), old code against new for each commit:
+All 102 PDFs (two reading lists, a project literature folder and a folder of recent downloads), old code against new for each commit:
 
 - **`92042ef`:** only STARNet changes, from two code links to one.
 - **`2671d54`:** only Chen changes. It loses volume, issue, ISSN, PMID and the OA licence and link that belonged to the journal article.

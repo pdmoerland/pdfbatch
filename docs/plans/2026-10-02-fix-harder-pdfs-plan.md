@@ -10,7 +10,7 @@ iteration: 5
 
 ## Overview
 
-Running pdfbatch on a real reading list (`_PDM/Reader/Transcription factors`) left some PDFs unresolved. Three of them each exposed a different gap, and each fix is general rather than a special case for one file.
+Running pdfbatch on a real reading list on transcription factors left some PDFs unresolved. Three of them each exposed a different gap, and each fix is general rather than a special case for one file.
 
 | PDF | Symptom | Root cause | Fix | Commit |
 |---|---|---|---|---|
@@ -32,7 +32,7 @@ Running pdfbatch on a real reading list (`_PDM/Reader/Transcription factors`) le
 
 ## Verification
 
-- **Page-1 extraction**, before vs after the TextPage refactor, on 58 PDFs (5 fixtures, 44 in *Transcription factors*, 9 in *GRN_inference*):
+- **Page-1 extraction**, before vs after the TextPage refactor, on 58 PDFs (5 fixtures, 44 from the transcription-factor reading list, 9 from a project literature folder):
   - Page text and title guesses: identical.
   - Header/footer bands: differ only at band edges. `extractTextbox` also takes characters that cross a band's edge, and keeps hyphens.
   - DOIs and arXiv IDs found in the bands: identical, except SCENIC+, whose header DOI is now found directly.
@@ -53,7 +53,7 @@ On the 58 PDFs, title guesses changed in 6. The thesis gets its real title first
 
 ## Papers without a DOI
 
-Three *Cancer Research* papers from 2001–2003 (`_PDM/Reader/Markers`: `quakenbush_cancer.pdf`, `rogers_renal_cancer_seldi.pdf`, `wright_serum.pdf`) were unresolved. The journal registered no DOIs then, so CrossRef doesn't know them. OpenAlex and Europe PMC do.
+Three *Cancer Research* papers from 2001–2003, from a reading list on cancer markers (`quakenbush_cancer.pdf`, `rogers_renal_cancer_seldi.pdf`, `wright_serum.pdf`) were unresolved. The journal registered no DOIs then, so CrossRef doesn't know them. OpenAlex and Europe PMC do.
 
 | Problem | Fix |
 |---|---|
@@ -65,7 +65,7 @@ Three *Cancer Research* papers from 2001–2003 (`_PDM/Reader/Markers`: `quakenb
 | PubMed-style abbreviated pages (`7792–7`). | One `_page_fields` helper for all three sources expands them, drops a last page equal to the first, and recognises article numbers written as pages (`Article5`, which Europe PMC uses too). |
 | An all-caps family name from OpenAlex (`EARLE-HUGHES`). | `Author.from_display` puts it in normal case. |
 
-Verified on 100 PDFs (both Reader folders and *GRN_inference*), comparing APA citations from the old and new code:
+Verified on 100 PDFs (the two reading lists and a project literature folder), comparing APA citations from the old and new code:
 - the three papers go from unresolved to high;
 - `ringner-bcr.pdf` gets `23–26` instead of `23–6`;
 - two ranges like `2869–2869` become `2869`;
