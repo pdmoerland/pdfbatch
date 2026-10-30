@@ -6,7 +6,7 @@
 
 ```bash
 uv sync --extra dev
-uv run pdf-batch ~/papers --mailto you@uni.nl --unpaywall
+uv run pdf-batch ~/papers --mailto you@uni.nl
 # → ~/papers/_metadata/papers.md, papers.ris, papers.json
 ```
 
@@ -41,7 +41,7 @@ The LLM never writes metadata. It only produces a title or DOI, which goes back 
 
 OA status is one of `gold`, `diamond`, `hybrid`, `bronze`, `green` or `closed`, with license, version and a free-copy URL where one exists.
 
-- **Unpaywall** (`--unpaywall`) is used first, then OpenAlex.
+- **Unpaywall** is used first, then OpenAlex. Unpaywall needs a real e-mail address in `--mailto`; with a placeholder it refuses, and OpenAlex's data is used. `--no-unpaywall` skips it.
 - **arXiv, bioRxiv/medRxiv and other preprint DOIs** are green by rule.
 
 A `closed` paper whose PDF you hold came through a subscription, so don't redistribute it.
@@ -96,6 +96,7 @@ Every run puts each note under the paper's citation in `papers.md`, and in `pape
 | `--openalex-key` (env `OPENALEX_API_KEY`) | Use your own OpenAlex API key |
 | `--llm-model`, `--ollama-url` (env `OLLAMA_URL`) | Model and server for the `--llm` tier (defaults: `claude-haiku-4-5`, `qwen3:8b` at `http://localhost:11434`) |
 | `--workers 4` | Number of PDFs processed in parallel. APIs are throttled per host |
+| `--no-unpaywall` | Skip Unpaywall and take OA data from OpenAlex only (Unpaywall is on by default) |
 | `--retry-unresolved` | Re-process only the PDFs left unresolved last time, e.g. after adding `--grobid`, `--llm` or Tesseract (`--force` redoes everything) |
 | `--cache-dir DIR` | Where API responses and link checks are cached for 30 days. Default: `PDFBATCH_CACHE_DIR` if set, else the per-user cache folder: `%LOCALAPPDATA%\pdfbatch\Cache` (Windows), `~/Library/Caches/pdfbatch` (macOS), `$XDG_CACHE_HOME/pdfbatch` or `~/.cache/pdfbatch` (Linux). A `.pdfbatch_cache/` folder from earlier versions is no longer used and can be deleted; it may contain your OpenAlex API key |
 

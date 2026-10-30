@@ -20,7 +20,7 @@ CLI that turns a folder of PDFs into `<name>.md` + `<name>.ris` (EndNote/Zotero)
 
 ```bash
 uv sync --extra dev               # works in any shell; Windows PowerShell 5.1 has no &&
-uv run pdf-batch ~/papers --unpaywall
+uv run pdf-batch ~/papers
 uv run pytest                     # offline: synthetic PDFs + mocked APIs
 uv run ruff check pdfbatch tests bench
 uv run python bench/run_benchmark.py run --pdfs bench/pdfs --gold bench/gold.csv   # real APIs

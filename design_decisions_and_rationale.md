@@ -35,7 +35,7 @@ pdfbatch started as a spin-off of a Slack bot that resolved paper *links* DOI-fi
 For each PDF the pipeline is: **identify → resolve → validate → enrich → find links** ([`pipeline.py`](pdfbatch/pipeline.py)).
 
 - **Resolve.** A DOI goes to CrossRef first. If CrossRef doesn't know it, it goes to OpenAlex, which also covers DataCite DOIs (arXiv, Zenodo). An arXiv ID goes to the arXiv API.
-- **Enrich.** OpenAlex, Europe PMC and optionally Unpaywall fill the gaps.
+- **Enrich.** OpenAlex, Europe PMC and Unpaywall fill the gaps.
 
 **Why.** Structured APIs return stable, typed fields: given and family names, volume, issue, pages, ISSN, item type and preprint relations. A reference manager needs exactly these, and text extraction cannot supply them reliably. CrossRef alone covers the vast majority of journal articles.
 
@@ -135,7 +135,7 @@ The abstract goes to RIS (`AB`) and JSON. It was deliberately taken out of `pape
 
 OA status is one of `gold`, `diamond`, `hybrid`, `bronze`, `green` or `closed`, with licence, version and a free-copy URL where known.
 
-- **Unpaywall** (`--unpaywall`) wins when it returns a status. It needs a real e-mail address, so it is opt-in. If Unpaywall has no licence, the one already known is kept.
+- **Unpaywall** wins when it returns a status. If it has no licence, the one already known is kept. It is on by default since [iteration 16](docs/plans/2026-10-30-feat-unpaywall-by-default-plan.md) (`--no-unpaywall` turns it off). It was opt-in because it needs a real e-mail address, but `--mailto` is required anyway, and a refused request simply leaves the OpenAlex data. For journal articles the two agree (all 76 DOIs of a 92-PDF test set); for preprints Unpaywall is the only source of licence and version, because OpenAlex's record of a preprint DOI can be the merged journal article and is ignored.
 - **OpenAlex** otherwise.
 - **The preprint rule:** arXiv, bioRxiv/medRxiv, Research Square, Preprints.org, PsyArXiv, OSF Preprints, TechRxiv, Authorea and SSRN DOIs are green OA by definition (source `rule`).
 - **No data:** when nothing is known for a DOI, a note says so rather than guessing.
@@ -307,3 +307,4 @@ Principles applied in [iteration 4](docs/plans/2026-10-02-refactor-minimal-elega
 | 13 | [Double-spaced titles](docs/plans/2026-10-30-fix-double-spaced-titles-plan.md) | `680f9c6` |
 | 14 | [One definition per idea](docs/plans/2026-10-30-refactor-one-definition-per-idea-plan.md) | `c79f7b6` … `7ae9ca7` |
 | 15 | [Stable output order](docs/plans/2026-10-30-fix-stable-output-order-plan.md) | `d8932cf` |
+| 16 | [Unpaywall by default](docs/plans/2026-10-30-feat-unpaywall-by-default-plan.md) | `7d21633` |
