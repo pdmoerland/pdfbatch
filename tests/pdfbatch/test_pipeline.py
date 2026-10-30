@@ -180,6 +180,26 @@ def test_search_hit_with_a_near_miss_title_is_only_noted(tmp_path, http, monkeyp
             "its title differs.") in r.notes
 
 
+def test_double_spaced_title(tmp_path):
+    body = [(50, 260 + 14 * i, "We revisit the reported separation of cancer from control samples in serum proteomic", 12)
+            for i in range(12)]
+    doc = pymupdf.open()
+    # A double-spaced technical report: title lines 44 pt apart in a 17 pt display font.
+    fixtures._page(doc, [(50, 130, "Are the NCI/FDA Ovarian Proteomic Data", 17),
+                         (50, 174, "Biased? A Reply to Producers and Consumers", 17),
+                         (50, 220, "Keith A. Baggerly, Kevin R. Coombes, and Jeffrey S. Morris", 12), *body])
+    # A manuscript typed in one size throughout: the same gap separates title and authors.
+    fixtures._page(doc, [(50, 109, "Artifacts of Markov blanket filtering based on discretized features", 11),
+                         (50, 122, "in small sample size applications", 11),
+                         (50, 148, "Theo A. Knijnenburg, Marcel J.T. Reinders and Lodewyk F.A. Wessels", 11),
+                         (50, 174, "Information and Communication Theory Group, Delft University of Technology", 11)])
+    doc.save(tmp_path / "report.pdf")
+    titles = [pdf_reader._title_guesses(page.get_textpage(), page.rect) for page in doc]
+    doc.close()
+    assert titles[0][0] == "Are the NCI/FDA Ovarian Proteomic Data Biased? A Reply to Producers and Consumers"
+    assert titles[1][0] == "Artifacts of Markov blanket filtering based on discretized features in small sample size applications"
+
+
 def test_title_guess(pdf_dir):
     p = read_pdf(pdf_dir / "scan_0042.pdf")
     assert p.title_guess == "Phase separation of transcription factors in plant immunity"

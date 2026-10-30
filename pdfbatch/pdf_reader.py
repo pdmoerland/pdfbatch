@@ -10,6 +10,7 @@ import os
 import re
 import threading
 import unicodedata
+from collections import Counter
 from dataclasses import dataclass, field
 from functools import cache, cached_property
 from pathlib import Path
@@ -185,6 +186,14 @@ _TITLE_JUNK = re.compile(
 )
 
 
+# Max distance between the tops of two lines of one title, in font sizes. Double-spaced
+# manuscripts and technical reports set title lines ~2.5 sizes apart; that is allowed only
+# for a display font (≥ 1.2 × the body font), because in a manuscript typed in one size
+# throughout, the same gap also separates the title from the authors and affiliations.
+_TITLE_LINE_PITCH = 2.2
+_DISPLAY_LINE_PITCH = 3.0
+
+
 def _title_guesses(tp, rect) -> list[str]:
     """Runs of lines set in the three largest fonts in the top 60% of page 1, largest first.
 
@@ -201,11 +210,16 @@ def _title_guesses(tp, rect) -> list[str]:
             # titled "Microarray 1", and the stray digit alone can make a title search miss.
             text = " ".join(s["text"].strip() for s in spans if s["size"] >= 0.7 * size)
             lines.append((round(size, 1), line["bbox"][1], text))
+    chars = Counter()
+    for s, _, t in lines:
+        chars[s] += len(t)
+    body = chars.most_common(1)[0][0] if chars else 0
     guesses = []
     for size in sorted({s for s, _, _ in lines}, reverse=True)[:3]:
+        pitch = _DISPLAY_LINE_PITCH if size >= 1.2 * body else _TITLE_LINE_PITCH
         run = []                               # the first vertically contiguous run at this size
         for _, y, t in sorted((ln for ln in lines if abs(ln[0] - size) < 0.6), key=lambda ln: ln[1]):
-            if run and y - run[-1][0] > size * 2.2:
+            if run and y - run[-1][0] > size * pitch:
                 break
             run.append((y, t))
         text = re.sub(r"-\s(?=[a-z])", "", " ".join(" ".join(t for _, t in run).split()))  # de-hyphenate
