@@ -177,6 +177,8 @@ Every run writes three files to `<input>/_metadata/` ([`writers.py`](pdfbatch/wr
 
 The full records, and the only file that is read back.
 
+All three files list papers in one order (`sort_key`): first author, year, title, and the PDF's path for ties such as identical copies. Worker threads finish in any order, so without it two runs over the same folder could write the same records differently, and `papers.json` would be needlessly hard to diff.
+
 All three files are written to a temporary file in the same folder and then renamed over the old one, so an interrupted run never leaves a truncated `papers.json`. A `papers.json` that cannot be read is not silently replaced: it is kept as `papers.json.bak`, the run says so, and every PDF is processed again.
 
 ### `papers.ris`
@@ -304,3 +306,4 @@ Principles applied in [iteration 4](docs/plans/2026-10-02-refactor-minimal-elega
 | 12 | [Other versions are noted, not cited](docs/plans/2026-10-30-fix-other-versions-plan.md) | `0084117`, `6fe826a` |
 | 13 | [Double-spaced titles](docs/plans/2026-10-30-fix-double-spaced-titles-plan.md) | `680f9c6` |
 | 14 | [One definition per idea](docs/plans/2026-10-30-refactor-one-definition-per-idea-plan.md) | `c79f7b6` … `7ae9ca7` |
+| 15 | [Stable output order](docs/plans/2026-10-30-fix-stable-output-order-plan.md) | `d8932cf` |
