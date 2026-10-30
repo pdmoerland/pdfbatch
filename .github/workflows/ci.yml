@@ -49,6 +49,10 @@ jobs:
           uv run pytest -rfE --tb=short 2>&1 | tee pytest.log
           status=${PIPESTATUS[0]}
           if [ "$status" != 0 ]; then
-            echo "::error title=pytest failed::$(grep -E '^(FAILED|ERROR)|^E  ' pytest.log | head -40 | awk '{printf "%s%%0A", $0}')"
+            lines=$(grep -E '^(FAILED|ERROR)|^E  ' pytest.log | head -40)
+            # No failed test reported (a crash, a collection or usage error): show how the output ended.
+            [ -n "$lines" ] || lines=$(tail -n 30 pytest.log)
+            echo                               # a crash can leave the last line open; ::error must start one
+            echo "::error title=pytest exited with $status::$(printf '%s\n' "$lines" | awk '{printf "%s%%0A", $0}')"
           fi
           exit "$status"
