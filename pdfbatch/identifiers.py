@@ -85,6 +85,11 @@ def _before_references(text: str) -> str:
     return text[: m.start()] if m else text
 
 
+def _page1(pdf: PdfContent) -> str:
+    """Page 1 up to a References heading, if it has one."""
+    return _before_references(pdf.page_texts[0]) if pdf.page_texts else ""
+
+
 # Words that introduce *another* version of the article ("A previous version of this article
 # appeared as an Early Online Release (DOI: ….eor)"). Not "preprint": bioRxiv stamps the
 # PDF's own DOI as "bioRxiv preprint doi: …".
@@ -104,8 +109,7 @@ def _other_versions_in(text: str) -> list[str]:
 
 def other_version_dois(pdf: PdfContent) -> list[str]:
     """DOIs page 1 names as another version of this article: noted, never its own DOI."""
-    p1 = _before_references(pdf.page_texts[0]) if pdf.page_texts else ""
-    return list(dict.fromkeys(_other_versions_in(pdf.header_footer_text) + _other_versions_in(p1)))
+    return list(dict.fromkeys(_other_versions_in(pdf.header_footer_text) + _other_versions_in(_page1(pdf))))
 
 
 def find_candidates(pdf: PdfContent) -> list[Candidate]:
@@ -132,7 +136,7 @@ def find_candidates(pdf: PdfContent) -> list[Candidate]:
     for a in _arxiv_in(pdf.header_footer_text):
         add("arxiv", a, "page1-margin", 0.9)
 
-    p1 = _before_references(pdf.page_texts[0]) if pdf.page_texts else ""
+    p1 = _page1(pdf)
     for i, d in enumerate(_dois_in(p1)):
         add("doi", d, "page1", 0.8 - 0.1 * i)          # the first DOI on page 1 is usually ours
     for a in _arxiv_in(p1):
