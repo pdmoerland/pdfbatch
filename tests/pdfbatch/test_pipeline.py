@@ -750,6 +750,16 @@ def test_api_key_not_in_cache_key(tmp_path, monkeypatch):
     h.cache.close()
 
 
+def test_api_fields_are_record_fields(http):
+    # _merge skips keys that are not Record fields, so a misspelt one would vanish silently.
+    doi = "10.1038/s41592-024-02201-0"
+    found = [apis.crossref_work(http, doi), apis.openalex_work(http, doi), apis.arxiv_work(http, "2401.01234"),
+             apis.europepmc(http, doi), *apis.crossref_search(http, "phase separation of transcription factors")]
+    assert all(found)
+    known = set(Record.__dataclass_fields__) | {"_license"}
+    assert {k for f in found for k in f} - known == set()
+
+
 def test_404_expires_after_a_day(tmp_path, monkeypatch):
     # A DOI unknown today (registered after its manuscript printed it) may resolve next week.
     h = apis.Http("t@example.org", cache_dir=tmp_path)
