@@ -600,3 +600,21 @@ def test_corrupt_json_is_kept_and_reported(protocol_only, http, tmp_path, capsys
     assert (out / "papers.json.bak").read_text(encoding="utf-8") == "[{"
     assert len(read_json(out / "papers.json")) == 1
     assert "papers.json could not be read" in capsys.readouterr().err
+
+
+class _Response:
+    def __init__(self, status_code, body=None, headers=None):
+        self.status_code, self.body, self.headers = status_code, body, headers or {}
+
+    def json(self):
+        return self.body
+
+
+def test_retry_after_is_capped(monkeypatch):
+    replies = [_Response(429, headers={"Retry-After": "3600"}), _Response(200, {"ok": True})]
+    sleeps = []
+    h = apis.Http("t@example.org", cache_dir=None)
+    monkeypatch.setattr(h.session, "get", lambda *a, **k: replies.pop(0))
+    monkeypatch.setattr(apis.time, "sleep", sleeps.append)
+    assert h.get("https://api.example.org/x") == {"ok": True}
+    assert sleeps and max(sleeps) <= apis.MAX_RETRY_AFTER == 60

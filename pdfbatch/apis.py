@@ -25,6 +25,16 @@ from . import __version__
 from .record import Author, OpenAccess
 
 _RETRY = {429, 500, 502, 503, 504}
+MAX_RETRY_AFTER = 60.0                 # seconds; a server's "Retry-After: 3600" must not stall a worker
+
+
+def _retry_after(value: Optional[str], default: float) -> float:
+    """Seconds to wait: the server's Retry-After (decimals too), capped; `default` for an
+    HTTP-date or no header."""
+    try:
+        return max(0.0, min(float(value), MAX_RETRY_AFTER))      # never negative
+    except (TypeError, ValueError):
+        return default
 
 
 class Http:
@@ -77,8 +87,7 @@ class Http:
                     self.cache.set(key, "__404__", expire=self.ttl)
                 return None
             if r.status_code in _RETRY and attempt < retries:
-                ra = r.headers.get("Retry-After")
-                time.sleep(float(ra) if ra and ra.isdigit() else delay)
+                time.sleep(_retry_after(r.headers.get("Retry-After"), delay))
                 delay *= 2
                 continue
             if r.status_code != 200:
