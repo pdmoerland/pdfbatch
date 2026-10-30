@@ -309,3 +309,4 @@ Principles applied in [iteration 4](docs/plans/2026-10-02-refactor-minimal-elega
 | 15 | [Stable output order](docs/plans/2026-10-30-fix-stable-output-order-plan.md) | `d8932cf` |
 | 16 | [Unpaywall by default](docs/plans/2026-10-30-feat-unpaywall-by-default-plan.md) | `7d21633` |
 | 17 | [PyMuPDF lock, short-lived 404s, checked field names](docs/plans/2026-10-30-fix-threads-and-negative-cache-plan.md) | `4988a8a`, `3d47e14`, `d108b71` |
+| 18 | [CI on Linux, macOS and Windows](docs/plans/2026-10-30-feat-ci-plan.md) | `81c672f` … `b721dc6` |

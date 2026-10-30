@@ -112,7 +112,11 @@ Run `pdf-batch --help` for the full list.
 
 ```bash
 uv run pytest
+uv run ruff check pdfbatch tests bench
+uv run mypy
 ```
+
+[CI](.github/workflows/ci.yml) runs all three on Linux, macOS and Windows, with Python 3.11 and 3.13, on every push and pull request to `main`.
 
 The tests generate synthetic PDFs and mock the APIs with real response shapes, so they run offline. The cases covered are:
 

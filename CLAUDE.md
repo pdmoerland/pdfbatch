@@ -23,8 +23,11 @@ uv sync --extra dev               # works in any shell; Windows PowerShell 5.1 h
 uv run pdf-batch ~/papers
 uv run pytest                     # offline: synthetic PDFs + mocked APIs
 uv run ruff check pdfbatch tests bench
+uv run mypy                       # files are set in pyproject.toml
 uv run python bench/run_benchmark.py run --pdfs bench/pdfs --gold bench/gold.csv   # real APIs
 ```
+
+CI (`.github/workflows/ci.yml`) runs Ruff, mypy and pytest on Linux, macOS and Windows × Python 3.11 and 3.13.
 
 ## Conventions
 
