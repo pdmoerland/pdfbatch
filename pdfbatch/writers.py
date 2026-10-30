@@ -72,8 +72,13 @@ def _apa_name(a: Author) -> str:
     return f"{a.family}, {initials}" if initials else a.family
 
 
+def _md_escape(s: str) -> str:
+    """Backslash-escape what Markdown would read as markup ("The *lac* operon")."""
+    return re.sub(r"([\\*_\[\]`])", r"\\\1", s)
+
+
 def _apa_authors(authors: List[Author]) -> str:
-    names = [_apa_name(a) for a in authors]
+    names = [_md_escape(_apa_name(a)) for a in authors]
     if len(names) <= 1:
         return "".join(names)
     if len(names) > 20:                        # first 19, an ellipsis, the last
@@ -88,11 +93,12 @@ def _sentence_case(title: str) -> str:
 
 
 def apa(r: Record) -> str:
-    title = _sentence_case(_one_line(r.title)).rstrip(".")
+    """The APA 7 reference as Markdown: titles and names escaped, journal and volume in italics."""
+    title = _md_escape(_sentence_case(_one_line(r.title)).rstrip("."))
     title = f"{title}." if title else ""
     source = ""
     if r.journal:
-        source = f"*{r.journal}*"
+        source = f"*{_md_escape(r.journal)}*"
         if r.volume:
             source += f", *{r.volume}*" + (f"({r.issue})" if r.issue else "")
         if r.first_page:

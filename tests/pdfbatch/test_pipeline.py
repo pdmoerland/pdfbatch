@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 import time
 from concurrent.futures import ThreadPoolExecutor
 from itertools import pairwise
@@ -649,3 +650,11 @@ def test_validate_checks_at_most_five_authors(pdf_dir, monkeypatch):
          "authors": [Author("X")] + [Author(f"Physicist{i:04d}", "A") for i in range(1000)]}
     assert validate(f, pdf)[0] == "low"
     assert calls == [f"physicist{i:04d}" for i in range(5)]       # the one-letter name is skipped first
+
+
+def test_apa_escapes_markdown():
+    r = Record(title="The *lac* operon_1", journal="J_Mol [Biol]", authors=[Author("O*Brien", "Pat")], year="1961")
+    line = apa(r)
+    assert r"O\*Brien, P." in line and r"The \*lac\* operon\_1." in line
+    assert r"*J\_Mol \[Biol\]*." in line
+    assert len(re.findall(r"(?<!\\)\*", line)) == 2             # one pair of italics, around the journal
