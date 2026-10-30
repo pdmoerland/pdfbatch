@@ -781,6 +781,30 @@ def test_default_cache_dir(tmp_path, monkeypatch):
     assert apis.default_cache_dir() == tmp_path / "xdg" / "pdfbatch"
 
 
+@pytest.mark.parametrize("platform, env, want", [
+    ("win32", {"LOCALAPPDATA": "local"}, ("local", "pdfbatch", "Cache")),
+    ("win32", {}, ("home", "AppData", "Local", "pdfbatch", "Cache")),
+    ("darwin", {}, ("home", "Library", "Caches", "pdfbatch")),
+    ("linux", {}, ("home", ".cache", "pdfbatch")),
+])
+def test_default_cache_dir_per_platform(tmp_path, monkeypatch, platform, env, want):
+    # Every branch runs on every CI runner: the platform and the home folder are faked.
+    for var in ("PDFBATCH_CACHE_DIR", "LOCALAPPDATA", "XDG_CACHE_HOME"):
+        monkeypatch.delenv(var, raising=False)
+    for var, sub in env.items():
+        monkeypatch.setenv(var, str(tmp_path / sub))
+    monkeypatch.setattr(apis.sys, "platform", platform)
+    monkeypatch.setattr(apis.Path, "home", lambda: tmp_path / "home")
+    assert apis.default_cache_dir() == tmp_path.joinpath(*want)
+
+
+def test_hint_for_a_stray_quote(tmp_path, capsys):
+    # Windows reads "C:\papers\" as C:\papers" : the backslash escapes the closing quote.
+    assert cli.main([str(tmp_path / "papers") + '"', "--mailto", "t@example.org"]) == 1
+    err = capsys.readouterr().err
+    assert "Not a folder" in err and "remove the backslash before the closing quote" in err
+
+
 def test_validate_checks_at_most_five_authors(pdf_dir, monkeypatch):
     calls = []
     real = pipeline._name_in
