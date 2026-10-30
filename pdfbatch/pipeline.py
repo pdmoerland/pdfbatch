@@ -230,7 +230,7 @@ def identify(http: apis.Http, s: Settings, pdf: PdfContent, rec: Record) -> None
     rec.notes.append("No record could be confirmed by title and authors; only PDF-derived fields are present.")
     if pdf.is_probably_scanned:
         rec.notes.append("PDF has no usable text layer — install Tesseract for automatic OCR "
-                         "of page 1, or run ocrmypdf on the file, and retry with --force.")
+                         "of page 1, or run ocrmypdf on the file, and rerun with --retry-unresolved.")
 
 
 # ---------------------------------------------------------------------------

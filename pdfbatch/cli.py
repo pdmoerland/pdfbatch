@@ -53,6 +53,8 @@ def _arguments(argv) -> argparse.Namespace:
     ap.add_argument("--bom", action="store_true", help="write a UTF-8 BOM in the RIS file")
     ap.add_argument("--workers", type=int, default=4)
     ap.add_argument("--force", action="store_true", help="re-process PDFs already in the JSON file")
+    ap.add_argument("--retry-unresolved", action="store_true",
+                    help="re-process PDFs left unresolved last time, e.g. after adding --grobid, --llm or Tesseract")
     ap.add_argument("--cache-dir", type=Path, default=Path(".pdfbatch_cache"))
     args = ap.parse_args(argv)
     if not args.mailto:
@@ -116,7 +118,8 @@ def main(argv=None) -> int:
     known = {} if args.force else {r.pdf_sha256: r for r in read_json(json_path)}
     records, todo = [], []
     for p in pdfs:
-        if rec := known.get(sha256_file(p)):
+        rec = known.get(sha256_file(p))
+        if rec and not (args.retry_unresolved and rec.confidence == "unresolved"):
             rec = copy.deepcopy(rec)           # identical files share a hash, not a record
             rec.pdf_path = str(p)
             records.append(rec)

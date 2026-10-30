@@ -102,7 +102,7 @@ Run `pdf-batch --help` for the full list.
 
 ## Limits
 
-- **Scanned PDFs** with no text layer: page 1 is OCR'd when Tesseract is installed, which is enough to identify the paper (title, authors, often a JSTOR-style citation block). Code/data links in the rest of the scan are not found; run `ocrmypdf in.pdf out.pdf` for a fully searchable file. Without Tesseract they are flagged; rerun with `--force` after installing it.
+- **Scanned PDFs** with no text layer: page 1 is OCR'd when Tesseract is installed, which is enough to identify the paper (title, authors, often a JSTOR-style citation block). Code/data links in the rest of the scan are not found; run `ocrmypdf in.pdf out.pdf` for a fully searchable file. Without Tesseract they are flagged; rerun with `--retry-unresolved` after installing it.
 - **Theses, protocols and internal reports** usually have no DOI. They come out `unresolved` with PDF-derived fields only, so review them by hand.
 - **PyMuPDF is AGPL.** If that matters for redistribution, swap `pdf_reader.py` to pypdf plus pdfplumber; the rest is independent of it.
 

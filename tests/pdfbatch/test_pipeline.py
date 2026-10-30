@@ -508,3 +508,23 @@ def test_llm_bad_reply_keeps_record(protocol_only, http, tmp_path, monkeypatch, 
     assert r.confidence == "unresolved" and r.title.startswith("Internal lab protocol")
     assert not any(n.startswith("Crashed") for n in r.notes)
     assert "LLM fallback failed for 1 PDF(s)" in capsys.readouterr().err
+
+
+def test_retry_unresolved(tmp_path, http, monkeypatch):
+    src = tmp_path / "src"; src.mkdir()
+    doc = pymupdf.open()
+    fixtures._page(doc, [(50, 100, "Buffer preparation for chromatin accessibility assays", 18),
+                         (50, 140, "Anna Jansen and Bram de Vries", 11)])
+    doc.save(src / "buffers.pdf"); doc.close()
+    confidence = lambda: read_json(tmp_path / "out" / "papers.json")[0].confidence
+    assert _run_cli(src, tmp_path) == 0 and confidence() == "unresolved"
+
+    hit = {"message": {"items": [{"DOI": "10.1000/buffers", "type": "journal-article",
+                                  "title": ["Buffer preparation for chromatin accessibility assays"],
+                                  "author": [{"given": "Anna", "family": "Jansen"},
+                                             {"given": "Bram", "family": "de Vries"}]}]}}
+    real_route = fixtures.route
+    monkeypatch.setattr(fixtures, "route", lambda url, params: hit if url.endswith("api.crossref.org/works")
+                        else real_route(url, params))           # e.g. GROBID or an LLM now finds it
+    assert _run_cli(src, tmp_path) == 0 and confidence() == "unresolved"     # cached
+    assert _run_cli(src, tmp_path, "--retry-unresolved") == 0 and confidence() == "high"
