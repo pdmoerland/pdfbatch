@@ -17,7 +17,6 @@ import json
 import os
 import re
 import threading
-from typing import Optional
 
 import requests
 
@@ -42,7 +41,7 @@ SCHEMA = {
 }
 
 
-def _parse(text: str) -> Optional[dict]:
+def _parse(text: str) -> dict | None:
     text = re.sub(r"<think>.*?</think>", "", text, flags=re.S)
     text = re.sub(r"```(?:json)?|```", "", text).strip()
     m = re.search(r"\{.*\}", text, re.S)
@@ -56,7 +55,7 @@ def _parse(text: str) -> Optional[dict]:
 
 
 class LlmIdentifier:
-    def __init__(self, backend: str, model: Optional[str] = None, ollama_url: Optional[str] = None):
+    def __init__(self, backend: str, model: str | None = None, ollama_url: str | None = None):
         if backend == "anthropic" and not os.environ.get("ANTHROPIC_API_KEY"):
             raise ValueError("--llm anthropic needs ANTHROPIC_API_KEY (in the environment or .env)")
         self.backend = backend
@@ -68,7 +67,7 @@ class LlmIdentifier:
         self.failures = 0
         self._lock = threading.Lock()         # worker threads share one identifier and its counters
 
-    def identify(self, page1_text: str) -> Optional[dict]:
+    def identify(self, page1_text: str) -> dict | None:
         """A search key, or None. A failed call (network, a reply that is not the expected
         JSON) costs this PDF its last tier, never the PDF-derived fields it already has."""
         ask = {"anthropic": self._anthropic, "ollama": self._ollama}[self.backend]
@@ -86,7 +85,7 @@ class LlmIdentifier:
             self.tokens_in += tokens_in
             self.tokens_out += tokens_out
 
-    def _anthropic(self, text: str) -> Optional[dict]:
+    def _anthropic(self, text: str) -> dict | None:
         r = requests.post(
             "https://api.anthropic.com/v1/messages",
             headers={"x-api-key": os.environ["ANTHROPIC_API_KEY"], "anthropic-version": "2023-06-01",
@@ -105,7 +104,7 @@ class LlmIdentifier:
         self._count(usage.get("input_tokens", 0), usage.get("output_tokens", 0))
         return _parse("".join(b.get("text", "") for b in body.get("content", [])))
 
-    def _ollama(self, text: str) -> Optional[dict]:
+    def _ollama(self, text: str) -> dict | None:
         r = requests.post(
             f"{self.ollama_url}/api/chat",
             json={

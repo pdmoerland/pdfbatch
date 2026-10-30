@@ -9,7 +9,6 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass
-from typing import List, Optional
 
 from .pdf_reader import PdfContent
 
@@ -33,7 +32,7 @@ class Candidate:
     score: float
 
 
-def clean_doi(raw: str) -> Optional[str]:
+def clean_doi(raw: str) -> str | None:
     d = raw.strip()
     d = re.sub(r"^(?:https?://(?:dx\.)?doi\.org/|doi:\s*)", "", d, flags=re.I)
     # Trailing punctuation and unbalanced closing brackets.
@@ -51,7 +50,7 @@ def clean_doi(raw: str) -> Optional[str]:
     return d.lower()
 
 
-def _dois_in(text: str) -> List[str]:
+def _dois_in(text: str) -> list[str]:
     out = []
     # Re-join DOIs split at a line break right after the slash or a hyphen.
     text = re.sub(r"(10\.\d{4,9}/)\s*\n\s*", r"\1", text)
@@ -62,7 +61,7 @@ def _dois_in(text: str) -> List[str]:
     return out
 
 
-def _arxiv_in(text: str) -> List[str]:
+def _arxiv_in(text: str) -> list[str]:
     out = []
     for rx in (ARXIV_NEW_RE, ARXIV_URL_RE, ARXIV_OLD_RE):
         for m in rx.finditer(text):
@@ -71,7 +70,7 @@ def _arxiv_in(text: str) -> List[str]:
     return out
 
 
-def _xmp_dois(xmp: str) -> List[str]:
+def _xmp_dois(xmp: str) -> list[str]:
     out = []
     for tag in ("prism:doi", "dc:identifier", "pdfx:doi", "crossmark:DOI", "prism:url"):
         for m in re.finditer(rf"<{tag}[^>]*>(.*?)</{tag}>", xmp, re.S | re.I):
@@ -86,8 +85,8 @@ def _before_references(text: str) -> str:
     return text[: m.start()] if m else text
 
 
-def find_candidates(pdf: PdfContent) -> List[Candidate]:
-    cands: List[Candidate] = []
+def find_candidates(pdf: PdfContent) -> list[Candidate]:
+    cands: list[Candidate] = []
 
     def add(kind, value, source, score):
         for c in cands:

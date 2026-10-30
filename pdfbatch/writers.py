@@ -7,8 +7,8 @@ import json
 import os
 import re
 import tempfile
+from collections.abc import Iterable
 from pathlib import Path
-from typing import Dict, Iterable, List
 
 from .record import Author, Record
 
@@ -77,7 +77,7 @@ def _md_escape(s: str) -> str:
     return re.sub(r"([\\*_\[\]`])", r"\\\1", s)
 
 
-def _apa_authors(authors: List[Author]) -> str:
+def _apa_authors(authors: list[Author]) -> str:
     names = [_md_escape(_apa_name(a)) for a in authors]
     if len(names) <= 1:
         return "".join(names)
@@ -118,7 +118,7 @@ def apa(r: Record) -> str:
 # ---------------------------------------------------------------------------
 
 def ris_entry(r: Record, *, preprint_type: str = "JOUR", attach: str = "uri") -> str:
-    lines: List[str] = []
+    lines: list[str] = []
 
     def add(tag: str, val) -> None:
         if val not in (None, "", []):
@@ -191,7 +191,7 @@ def write_ris(records: Iterable[Record], path: Path, *, preprint_type: str = "JO
 # Markdown
 # ---------------------------------------------------------------------------
 
-def _md_entry(r: Record) -> List[str]:
+def _md_entry(r: Record) -> list[str]:
     pdf = Path(r.pdf_path)
     out = [f"**File:** [`{pdf.name}`]({pdf.as_uri()})", "", f"> {apa(r)}", ""]
     if r.user_notes:
@@ -214,7 +214,7 @@ def _md_entry(r: Record) -> List[str]:
     return out + ["", "---", ""]
 
 
-def write_markdown(records: List[Record], path: Path, *, llm_usage: str = "") -> None:
+def write_markdown(records: list[Record], path: Path, *, llm_usage: str = "") -> None:
     recs = sorted(records, key=sort_key)
     n_oa = sum(1 for r in recs if r.oa.is_oa)
     review = [r for r in recs if r.needs_review]
@@ -236,11 +236,11 @@ def write_markdown(records: List[Record], path: Path, *, llm_usage: str = "") ->
 # JSON
 # ---------------------------------------------------------------------------
 
-def write_json(records: List[Record], path: Path) -> None:
+def write_json(records: list[Record], path: Path) -> None:
     _write_atomic(path, json.dumps([r.to_dict() for r in records], indent=2, ensure_ascii=False))
 
 
-def read_json(path: Path) -> List[Record]:
+def read_json(path: Path) -> list[Record]:
     """The records of an earlier run; none if there was none. A file that cannot be read
     raises ValueError: silently starting over would hide why a rerun takes an hour."""
     if not path.exists():
@@ -255,13 +255,13 @@ def read_json(path: Path) -> List[Record]:
 # Your notes
 # ---------------------------------------------------------------------------
 
-def read_notes(path: Path) -> Dict[str, str]:
+def read_notes(path: Path) -> dict[str, str]:
     """`{pdf file name: note}` from a Markdown file you keep yourself: one `## <file name>`
     heading per paper, then free text (deeper headings and lists included). pdfbatch only
     reads it, so notes survive every run, `--force` included."""
     if not path.exists():
         return {}
-    notes: Dict[str, List[str]] = {}
+    notes: dict[str, list[str]] = {}
     name = None
     for line in path.read_text(encoding="utf-8").splitlines():
         if m := re.match(r"##\s+(.+?)\s*$", line):          # "###" and deeper stay part of the note

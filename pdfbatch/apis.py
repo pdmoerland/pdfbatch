@@ -18,7 +18,7 @@ import time
 import urllib.parse
 import xml.etree.ElementTree as ET
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 import diskcache
 import requests
@@ -42,7 +42,7 @@ def default_cache_dir() -> Path:
     return Path(os.environ.get("XDG_CACHE_HOME") or Path.home() / ".cache") / "pdfbatch"
 
 
-def _retry_after(value: Optional[str], default: float) -> float:
+def _retry_after(value: str | None, default: float) -> float:
     """Seconds to wait: the server's Retry-After (decimals too), capped; `default` for an
     HTTP-date or no header."""
     try:
@@ -54,14 +54,14 @@ def _retry_after(value: Optional[str], default: float) -> float:
 class Http:
     """requests + diskcache + polite headers + backoff. One instance per run."""
 
-    def __init__(self, mailto: str, cache_dir: Optional[Path], ttl_days: int = 30, timeout: int = 20):
+    def __init__(self, mailto: str, cache_dir: Path | None, ttl_days: int = 30, timeout: int = 20):
         self.mailto = mailto
         self.timeout = timeout
         self.ttl = ttl_days * 86400
         self.session = requests.Session()
         self.session.headers["User-Agent"] = f"pdfbatch/{__version__} (mailto:{mailto})"
         self.cache = diskcache.Cache(str(cache_dir)) if cache_dir else None
-        self._last: Dict[str, float] = {}
+        self._last: dict[str, float] = {}
         self._lock = threading.Lock()
 
     def _throttle(self, host: str, min_interval: float) -> None:
@@ -77,7 +77,7 @@ class Http:
         if wait > 0:
             time.sleep(wait)
 
-    def get(self, url: str, params: Optional[dict] = None, *, as_json: bool = True,
+    def get(self, url: str, params: dict | None = None, *, as_json: bool = True,
             min_interval: float = 0.12, retries: int = 3) -> Any:
         key = url + "?" + urllib.parse.urlencode(sorted((k, v) for k, v in (params or {}).items()
                                                         if k not in _UNCACHED_PARAMS))
@@ -121,7 +121,7 @@ class Http:
 # helpers
 # ---------------------------------------------------------------------------
 
-def strip_markup(s: Optional[str]) -> Optional[str]:
+def strip_markup(s: str | None) -> str | None:
     """JATS / HTML → plain text."""
     if not s:
         return None
@@ -133,7 +133,7 @@ def strip_markup(s: Optional[str]) -> Optional[str]:
     return s or None
 
 
-def _date_from_parts(obj: Optional[dict]) -> Optional[str]:
+def _date_from_parts(obj: dict | None) -> str | None:
     try:
         parts = obj["date-parts"][0]
     except (TypeError, KeyError, IndexError):
@@ -144,7 +144,7 @@ def _date_from_parts(obj: Optional[dict]) -> Optional[str]:
     return "-".join(f"{int(p):02d}" if i else str(p) for i, p in enumerate(parts))
 
 
-def _inverted_to_text(idx: Optional[dict]) -> Optional[str]:
+def _inverted_to_text(idx: dict | None) -> str | None:
     if not idx:
         return None
     pos = {}
@@ -154,7 +154,7 @@ def _inverted_to_text(idx: Optional[dict]) -> Optional[str]:
     return " ".join(pos[i] for i in sorted(pos)) or None
 
 
-def _norm_license(lic: Optional[str]) -> Optional[str]:
+def _norm_license(lic: str | None) -> str | None:
     if not lic:
         return None
     lic = lic.lower()
@@ -164,7 +164,7 @@ def _norm_license(lic: Optional[str]) -> Optional[str]:
     return lic
 
 
-def _page_fields(first: Optional[str], last: Optional[str] = None) -> dict:
+def _page_fields(first: str | None, last: str | None = None) -> dict:
     """Record page fields from a source's first and last page.
 
     Sources disagree on notation: article numbers given as pages (OpenAlex and Europe PMC
@@ -178,7 +178,7 @@ def _page_fields(first: Optional[str], last: Optional[str] = None) -> dict:
     return {"first_page": first or None, "last_page": last if last and last != first else None}
 
 
-def _page_range(pages: Optional[str]) -> dict:
+def _page_range(pages: str | None) -> dict:
     """`_page_fields` for a "first-last" string."""
     first, _, last = (pages or "").replace("–", "-").partition("-")
     return _page_fields(first, last)
@@ -188,7 +188,7 @@ def _page_range(pages: Optional[str]) -> dict:
 # CrossRef
 # ---------------------------------------------------------------------------
 
-def crossref_work(http: Http, doi: str) -> Optional[dict]:
+def crossref_work(http: Http, doi: str) -> dict | None:
     body = http.get(f"https://api.crossref.org/works/{urllib.parse.quote(doi, safe='/')}",
                     params={"mailto": http.mailto})
     if not body or "message" not in body:
@@ -242,7 +242,7 @@ def crossref_to_fields(m: dict) -> dict:
     }
 
 
-def crossref_search(http: Http, title: str, author: Optional[str] = None, rows: int = 5) -> List[dict]:
+def crossref_search(http: Http, title: str, author: str | None = None, rows: int = 5) -> list[dict]:
     q = title + (f" {author}" if author else "")
     body = http.get("https://api.crossref.org/works",
                     params={"query.bibliographic": q, "rows": rows, "mailto": http.mailto})
@@ -260,14 +260,14 @@ _OA_SELECT = ("id,doi,title,display_name,publication_date,type,authorships,prima
               "biblio,open_access,best_oa_location,abstract_inverted_index,ids")
 
 
-def _openalex_params(http: Http, api_key: Optional[str]) -> dict:
+def _openalex_params(http: Http, api_key: str | None) -> dict:
     p = {"mailto": http.mailto, "select": _OA_SELECT}
     if api_key:
         p["api_key"] = api_key
     return p
 
 
-def openalex_work(http: Http, doi: str, api_key: Optional[str] = None) -> Optional[dict]:
+def openalex_work(http: Http, doi: str, api_key: str | None = None) -> dict | None:
     """The OpenAlex record of exactly this DOI, or None.
 
     OpenAlex merges a preprint and its published version into one work: looked up by the
@@ -323,7 +323,7 @@ def openalex_to_fields(w: dict) -> dict:
     }
 
 
-def openalex_search(http: Http, title: str, api_key: Optional[str] = None, rows: int = 5) -> List[dict]:
+def openalex_search(http: Http, title: str, api_key: str | None = None, rows: int = 5) -> list[dict]:
     p = _openalex_params(http, api_key)
     p.update({"search": title, "per-page": rows})
     body = http.get("https://api.openalex.org/works", params=p)
@@ -337,7 +337,7 @@ def openalex_search(http: Http, title: str, api_key: Optional[str] = None, rows:
 # Unpaywall (optional; needs a real e-mail address)
 # ---------------------------------------------------------------------------
 
-def unpaywall(http: Http, doi: str, email: str) -> Optional[OpenAccess]:
+def unpaywall(http: Http, doi: str, email: str) -> OpenAccess | None:
     body = http.get(f"https://api.unpaywall.org/v2/{urllib.parse.quote(doi, safe='/')}",
                     params={"email": email})
     if not body:
@@ -360,7 +360,7 @@ def unpaywall(http: Http, doi: str, email: str) -> Optional[OpenAccess]:
 _ATOM = {"a": "http://www.w3.org/2005/Atom", "arxiv": "http://arxiv.org/schemas/atom"}
 
 
-def arxiv_work(http: Http, arxiv_id: str) -> Optional[dict]:
+def arxiv_work(http: Http, arxiv_id: str) -> dict | None:
     xml = http.get("https://export.arxiv.org/api/query",
                    params={"id_list": arxiv_id, "max_results": 1}, as_json=False, min_interval=3.0)
     if not xml:
@@ -400,7 +400,7 @@ def arxiv_work(http: Http, arxiv_id: str) -> Optional[dict]:
 # Europe PMC (abstract + PMID/PMCID backfill for biomedical papers)
 # ---------------------------------------------------------------------------
 
-def europepmc(http: Http, doi: Optional[str] = None, pmid: Optional[str] = None) -> Optional[dict]:
+def europepmc(http: Http, doi: str | None = None, pmid: str | None = None) -> dict | None:
     """By DOI, or by PMID for papers without one (PubMed-indexed papers from before DOIs)."""
     query = f'DOI:"{doi}"' if doi else f"EXT_ID:{pmid} AND SRC:MED"
     body = http.get("https://www.ebi.ac.uk/europepmc/webservices/rest/search",
@@ -424,7 +424,7 @@ def europepmc(http: Http, doi: Optional[str] = None, pmid: Optional[str] = None)
     }
 
 
-def journal_name(http: Http, issn: str) -> Optional[str]:
+def journal_name(http: Http, issn: str) -> str | None:
     """The journal's own name for an ISSN: 'Cancer Research', where NLM writes 'Cancer research'."""
     body = http.get(f"https://api.openalex.org/sources/issn:{issn}",
                     params={"mailto": http.mailto, "select": "display_name"})

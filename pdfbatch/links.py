@@ -4,9 +4,9 @@ from __future__ import annotations
 
 import re
 from collections import Counter
+from collections.abc import Callable, Iterable, Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Callable, Dict, Iterable, List, Optional, Sequence
 
 import diskcache
 import requests
@@ -69,7 +69,7 @@ def _repo_host(name: str, host: str, reserved: str) -> Platform:
                     reserved=frozenset(reserved.split()))
 
 
-PLATFORMS: List[Platform] = [          # order matters: first match wins
+PLATFORMS: list[Platform] = [          # order matters: first match wins
     _repo_host("github", "github.com",
                "about codespaces customer-stories enterprise events explore features issues login "
                "logout marketplace new notifications orgs organizations password_reset pricing pulls "
@@ -116,7 +116,7 @@ BLOCKLIST = frozenset(f"https://github.com/{r}" for r in (
     "google/jax"))
 
 
-def classify(url: str) -> Optional[Found]:
+def classify(url: str) -> Found | None:
     for p in PLATFORMS:
         if not p.url_re.match(url):
             continue
@@ -129,15 +129,15 @@ def classify(url: str) -> Optional[Found]:
     return None
 
 
-def _first_per_url(found: Iterable[Optional[Found]]) -> List[Found]:
-    first: Dict[str, Found] = {}
+def _first_per_url(found: Iterable[Found | None]) -> list[Found]:
+    first: dict[str, Found] = {}
     for f in found:
         if f:
             first.setdefault(f.url, f)
     return list(first.values())
 
 
-def extract(text: str) -> List[Found]:
+def extract(text: str) -> list[Found]:
     """Every recognised link in `text`, once per canonical URL, in order of appearance."""
     return _first_per_url(classify(m.group(0).rstrip(".,;:!?)"))
                           for m in re.finditer(r"https?://[^\s<>\"'\])]+", text))
@@ -150,8 +150,8 @@ def extract(text: str) -> List[Found]:
 _TAGS = ["Code", "Data", "Dataset", "Datasets", "Model", "Models", "Weights", "Repo", "Repository",
          "Website", "Project page", "Project", "HuggingFace", "GitHub", "GitLab", "Bitbucket",
          "Codeberg", "Zenodo", "Demo", "Checkpoints"]
-_TAG_RE = re.compile(r"\b(?P<label>%s)\s*[:\-–]\s*<?(?P<url>https?://\S+)"
-                     % "|".join(sorted(map(re.escape, _TAGS), key=len, reverse=True)), re.I)
+_TAG_RE = re.compile(r"\b(?P<label>{})\s*[:\-–]\s*<?(?P<url>https?://\S+)"
+                     .format("|".join(sorted(map(re.escape, _TAGS), key=len, reverse=True))), re.I)
 _TRIGGERS = [(re.compile(rx, re.I), label) for rx, label in [      # most specific first
     (r"\bCode\s+(?:is|are|will\s+be)?\s*available\s+at\b", "Code"),
     (r"\bCode\s+availability\b", "Code"),
@@ -177,10 +177,10 @@ def _position(text: str, f: Found) -> int:
     return -1
 
 
-def labels(text: str, links: Sequence[Found], window: int = 200) -> Dict[str, Optional[str]]:
+def labels(text: str, links: Sequence[Found], window: int = 200) -> dict[str, str | None]:
     """`{url: label}` from a tag in front of the URL ("Weights: https://…"), else from a
     trigger phrase in the `window` characters before it ("Data are available at")."""
-    out: Dict[str, Optional[str]] = dict.fromkeys(f.url for f in links)
+    out: dict[str, str | None] = dict.fromkeys(f.url for f in links)
     for m in _TAG_RE.finditer(text):
         url = m.group("url").rstrip(".,;:!?)>")
         for f in links:
@@ -235,7 +235,7 @@ _STATEMENT = re.compile(
     r"can be (?:found|accessed|downloaded|obtained))\b"
     r"|\b(?:(?:downloaded|obtained|retrieved|taken|adapted) from|provided (?:at|by|in)|based on|implemented in)\b",
     re.I)
-_TAG_BEFORE = re.compile(r"\b(?:%s)\s*[:\-–]\s*<?$" % "|".join(map(re.escape, _TAGS)), re.I)
+_TAG_BEFORE = re.compile(r"\b(?:{})\s*[:\-–]\s*<?$".format("|".join(map(re.escape, _TAGS))), re.I)
 
 
 def _claimed(text: str, i: int, window: int = 300) -> bool:
@@ -258,7 +258,7 @@ _AFTER_REFS = re.compile(
 )
 
 
-def find_links(pdf: PdfContent, checker: Optional[LinkChecker] = None) -> List[Link]:
+def find_links(pdf: PdfContent, checker: LinkChecker | None = None) -> list[Link]:
     # Drop zero-width spaces, which some publishers put inside printed URLs as break points
     # ("https://​zenodo.​org/…"), and re-join URLs broken at line ends: after / - _
     # ("…/org/\nrepo"), and after a dot only when the next line goes on in lower case

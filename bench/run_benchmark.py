@@ -16,10 +16,10 @@ import os
 import subprocess
 import sys
 from collections import Counter, defaultdict
+from collections.abc import Iterable
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, Iterable, List, Optional
 
 from dotenv import find_dotenv, load_dotenv
 
@@ -39,11 +39,11 @@ RESULTS = Path(__file__).parent / "results"
 # scoring (pure; tested offline)
 # ---------------------------------------------------------------------------
 
-def _doi(value: Optional[str]) -> Optional[str]:
+def _doi(value: str | None) -> str | None:
     return clean_doi(value) if value and value.strip() else None
 
 
-def outcome(gold_doi: Optional[str], rec: Record) -> str:
+def outcome(gold_doi: str | None, rec: Record) -> str:
     """One PDF's outcome. A wrong DOI is the expensive mistake, so anything resolved
     that does not match the gold DOI counts as wrong, including a DOI where gold has none."""
     gold = _doi(gold_doi)
@@ -70,7 +70,7 @@ def score(gold_rows: Iterable[dict], records: Iterable[Record]) -> dict:
     counts = Counter(p["outcome"] for p in per_pdf)
     n = len(per_pdf)
     decided = counts["correct"] + counts["wrong"]
-    by_route: Dict[str, Counter] = defaultdict(Counter)
+    by_route: dict[str, Counter] = defaultdict(Counter)
     for p in per_pdf:
         if p["outcome"] in ("correct", "wrong"):
             by_route[p["route"]][p["outcome"]] += 1
@@ -86,7 +86,7 @@ def score(gold_rows: Iterable[dict], records: Iterable[Record]) -> dict:
     }
 
 
-def changes(old: dict, new: dict) -> List[tuple]:
+def changes(old: dict, new: dict) -> list[tuple]:
     """(file, old outcome, new outcome) for every PDF scored in both runs whose outcome changed."""
     before = {p["sha256"]: p["outcome"] for p in old["per_pdf"]}
     return [(p["file"], before[p["sha256"]], p["outcome"]) for p in new["per_pdf"]
@@ -97,7 +97,7 @@ def changes(old: dict, new: dict) -> List[tuple]:
 # running pdfbatch
 # ---------------------------------------------------------------------------
 
-def _process(pdfs: Dict[str, Path], args) -> List[Record]:
+def _process(pdfs: dict[str, Path], args) -> list[Record]:
     """process_pdf on each PDF, with the CLI's Settings and HTTP cache."""
     settings = Settings(openalex_api_key=args.openalex_key, grobid_url=args.grobid, llm=args.llm_tier)
     http = apis.Http(args.mailto, args.cache_dir / "http")
@@ -111,12 +111,12 @@ def _process(pdfs: Dict[str, Path], args) -> List[Record]:
         return list(ex.map(one, pdfs.items()))
 
 
-def _pdfs(folder: Path) -> Dict[str, Path]:
+def _pdfs(folder: Path) -> dict[str, Path]:
     """{sha256: path}; the hash is the key, so renamed files still match their gold row."""
     return {sha256_file(p): p for p in sorted(folder.rglob("*")) if p.is_file() and p.suffix.lower() == ".pdf"}
 
 
-def _read_gold(path: Path) -> List[dict]:
+def _read_gold(path: Path) -> list[dict]:
     with open(path, encoding="utf-8-sig", newline="") as fh:     # -sig: Excel saves CSV with a BOM
         return list(csv.DictReader(fh))
 
@@ -155,7 +155,7 @@ def init(args) -> int:
     return 0
 
 
-def _pct(x: Optional[float]) -> str:
+def _pct(x: float | None) -> str:
     return "-" if x is None else f"{100 * x:.1f}%"
 
 

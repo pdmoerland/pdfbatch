@@ -18,9 +18,10 @@ a missing record costs a minute by hand, a wrong one may never be noticed.
 from __future__ import annotations
 
 import re
+from collections.abc import Iterator
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Iterator, Literal, Optional, Tuple
+from typing import Literal
 
 import requests
 from rapidfuzz import fuzz, process
@@ -39,16 +40,16 @@ PREPRINT_DOI_PREFIXES = ("10.1101/", "10.48550/", "10.21203/", "10.20944/", "10.
 # A verdict is about one API record: does it describe this PDF? `low` means it does not.
 # Not to be confused with Record.confidence, the outcome for the PDF (see record.Confidence).
 Verdict = Literal["high", "medium", "low"]
-Hit = Tuple[Optional[dict], Verdict, str]      # (API fields, verdict, how it was found)
+Hit = tuple[dict | None, Verdict, str]      # (API fields, verdict, how it was found)
 
 
 @dataclass
 class Settings:
-    unpaywall_email: Optional[str] = None
-    openalex_api_key: Optional[str] = None
-    grobid_url: Optional[str] = None
-    llm: Optional[LlmIdentifier] = None
-    link_checker: Optional[LinkChecker] = None
+    unpaywall_email: str | None = None
+    openalex_api_key: str | None = None
+    grobid_url: str | None = None
+    llm: LlmIdentifier | None = None
+    link_checker: LinkChecker | None = None
 
 
 # ---------------------------------------------------------------------------
@@ -78,7 +79,7 @@ def _name_in(pdf: PdfContent, name: str) -> bool:
                for w in name.split())
 
 
-def validate(f: dict, pdf: PdfContent, *, all_authors: bool = False) -> Tuple[Verdict, float]:
+def validate(f: dict, pdf: PdfContent, *, all_authors: bool = False) -> tuple[Verdict, float]:
     """Does the API record describe *this* PDF? → (verdict, title score).
 
     `high`: the title is found (≥ 90) and so are the authors; `medium`: the title nearly
@@ -106,7 +107,7 @@ def validate(f: dict, pdf: PdfContent, *, all_authors: bool = False) -> Tuple[Ve
 # identification
 # ---------------------------------------------------------------------------
 
-def _resolve(http: apis.Http, s: Settings, kind: str, value: str) -> Optional[dict]:
+def _resolve(http: apis.Http, s: Settings, kind: str, value: str) -> dict | None:
     """API fields for a DOI or arXiv ID, with `_via` naming the API that answered."""
     if kind == "arxiv":
         f, via = apis.arxiv_work(http, value), "arxiv"
@@ -119,7 +120,7 @@ def _resolve(http: apis.Http, s: Settings, kind: str, value: str) -> Optional[di
     return f
 
 
-def _resembles(query: str, title: Optional[str]) -> bool:
+def _resembles(query: str, title: str | None) -> bool:
     """A search hit's title resembles the title searched for, and is not a mere fragment of it.
 
     A hit titled after a phrase in the query ("Surface-Enhanced Laser Desorption/Ionization
@@ -131,7 +132,7 @@ def _resembles(query: str, title: Optional[str]) -> bool:
 
 
 def _title_search(http: apis.Http, s: Settings, pdf: PdfContent, title: str,
-                  surname: Optional[str] = None) -> Tuple[Optional[dict], Verdict]:
+                  surname: str | None = None) -> tuple[dict | None, Verdict]:
     """CrossRef, then OpenAlex: the best hit that resembles `title` and validates.
 
     OpenAlex is asked whenever CrossRef has nothing *usable*, not only nothing at all:
@@ -150,8 +151,8 @@ def _title_search(http: apis.Http, s: Settings, pdf: PdfContent, title: str,
     return None, "low"
 
 
-def _lookup(http: apis.Http, s: Settings, pdf: PdfContent, doi: Optional[str], title: Optional[str],
-            surname: Optional[str] = None) -> Tuple[Optional[dict], Verdict]:
+def _lookup(http: apis.Http, s: Settings, pdf: PdfContent, doi: str | None, title: str | None,
+            surname: str | None = None) -> tuple[dict | None, Verdict]:
     """A proposed DOI if it validates, else a search for the proposed title."""
     doi = clean_doi(doi) if doi else None
     if doi and (f := _resolve(http, s, "doi", doi)) and _good(conf := validate(f, pdf)[0]):
@@ -159,7 +160,7 @@ def _lookup(http: apis.Http, s: Settings, pdf: PdfContent, doi: Optional[str], t
     return _title_search(http, s, pdf, title, surname) if title else (None, "low")
 
 
-def _grobid(s: Settings, path: Path) -> Optional[dict]:
+def _grobid(s: Settings, path: Path) -> dict | None:
     """Header-only GROBID call → {'title', 'doi'}; zero tokens."""
     try:
         with open(path, "rb") as fh:
@@ -174,7 +175,7 @@ def _grobid(s: Settings, path: Path) -> Optional[dict]:
     return {"title": bib("title"), "doi": bib("doi")}
 
 
-def _best_candidate(http: apis.Http, s: Settings, pdf: PdfContent) -> Optional[Hit]:
+def _best_candidate(http: apis.Http, s: Settings, pdf: PdfContent) -> Hit | None:
     """Tiers 1–2: the best confirmed identifier embedded in or printed on the PDF."""
     best = None
     for c in find_candidates(pdf)[:6]:
@@ -293,7 +294,7 @@ def enrich(http: apis.Http, s: Settings, pdf: PdfContent, rec: Record) -> None:
 
 # ---------------------------------------------------------------------------
 
-def process_pdf(path: Path, http: apis.Http, s: Settings, sha256: Optional[str] = None) -> Record:
+def process_pdf(path: Path, http: apis.Http, s: Settings, sha256: str | None = None) -> Record:
     rec = Record(pdf_path=str(path.resolve()))
     try:
         pdf = read_pdf(path, sha256)

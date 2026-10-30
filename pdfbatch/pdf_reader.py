@@ -13,7 +13,6 @@ import unicodedata
 from dataclasses import dataclass, field
 from functools import cache, cached_property
 from pathlib import Path
-from typing import List, Optional
 
 import pymupdf  # PyMuPDF (AGPL); see README for the permissive alternative
 
@@ -24,14 +23,14 @@ class PdfContent:
     sha256: str
     info: dict                         # PDF Info dict (title, author, subject, keywords, …)
     xmp: str                           # raw XMP packet ('' if none)
-    page_texts: List[str]              # text of every page
+    page_texts: list[str]              # text of every page
     header_footer_text: str            # page-1 text in top/bottom 12% bands + left/right margins
-    title_guesses: List[str]           # large-font text runs on page 1, largest first
-    link_uris: List[str] = field(default_factory=list)   # http(s) link annotations
+    title_guesses: list[str]           # large-font text runs on page 1, largest first
+    link_uris: list[str] = field(default_factory=list)   # http(s) link annotations
     ocr: bool = False                  # page-1 text came from OCR (scan without a text layer)
 
     @property
-    def title_guess(self) -> Optional[str]:
+    def title_guess(self) -> str | None:
         return self.title_guesses[0] if self.title_guesses else None
 
     @property
@@ -47,7 +46,7 @@ class PdfContent:
         return not self.page_texts or unreadable(self.page_texts[0])
 
     @property
-    def opening(self) -> Optional[str]:
+    def opening(self) -> str | None:
         """The first two substantial lines of page 1, joined: in reading order the title usually
         comes first. A last-resort search query for when font sizes mislead, as they do in OCR
         output, where sizes are estimated from the scanned glyphs."""
@@ -65,7 +64,7 @@ class PdfContent:
         return normalize("\n".join(self.page_texts[:3]) + " " + str(self.info.get("title", "")))
 
 
-def normalize(s: Optional[str]) -> str:
+def normalize(s: str | None) -> str:
     """Lower-case ASCII words: no accents, ligatures, hyphenated line breaks or punctuation."""
     s = unicodedata.normalize("NFKD", s or "")
     s = "".join(c for c in s if not unicodedata.combining(c)).lower()
@@ -88,7 +87,7 @@ def sha256_file(path: Path) -> str:
     return h.hexdigest()
 
 
-def read_pdf(path: Path, sha256: Optional[str] = None) -> PdfContent:
+def read_pdf(path: Path, sha256: str | None = None) -> PdfContent:
     """`sha256`: the file's hash when the caller already has it (the CLI hashes every PDF)."""
     doc = pymupdf.open(path)
     try:
@@ -143,14 +142,14 @@ _OCR_LOCK = threading.Lock()
 
 
 @cache
-def _tessdata() -> Optional[str]:
+def _tessdata() -> str | None:
     try:
         return pymupdf.get_tessdata()          # TESSDATA_PREFIX, or a tesseract on PATH
     except RuntimeError:
         return next((d for d in _TESSDATA_DIRS if Path(d, "eng.traineddata").is_file()), None)
 
 
-def _ocr(page) -> Optional["pymupdf.TextPage"]:
+def _ocr(page) -> pymupdf.TextPage | None:
     """Page text by OCR, for scans without a text layer; None when Tesseract is not installed.
 
     Only page 1 is read: it carries the title, authors and often a citation block
@@ -186,7 +185,7 @@ _TITLE_JUNK = re.compile(
 )
 
 
-def _title_guesses(tp, rect) -> List[str]:
+def _title_guesses(tp, rect) -> list[str]:
     """Runs of lines set in the three largest fonts in the top 60% of page 1, largest first.
 
     Usually the first is the title. Not always: a series banner ("… Working Paper
@@ -217,7 +216,7 @@ def _title_guesses(tp, rect) -> List[str]:
     return guesses
 
 
-def abstract_from_text(text: str) -> Optional[str]:
+def abstract_from_text(text: str) -> str | None:
     """Slice an abstract out of page-1/2 text when every API lacked one."""
     m = re.search(r"\b(?:abstract|summary)\b[\s:.\-—]*\n?", text, re.I)
     if not m:

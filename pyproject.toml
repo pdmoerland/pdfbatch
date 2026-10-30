@@ -39,5 +39,5 @@ addopts = "-ra"
 line-length = 130
 
 [tool.ruff.lint]
-select = ["E", "F", "W", "B"]
+select = ["E", "F", "W", "B", "UP"]
 ignore = ["E731"]
