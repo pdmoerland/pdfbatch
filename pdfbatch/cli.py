@@ -87,6 +87,11 @@ def main(argv=None) -> int:
         if '"' in str(src):                    # Windows reads `\"` as a literal quote
             log('Hint: remove the backslash before the closing quote ("...\\folder", not "...\\folder\\").')
         return 1
+    try:                                       # before any work, not once per PDF
+        llm = LlmIdentifier(args.llm, args.llm_model, args.ollama_url) if args.llm != "none" else None
+    except ValueError as e:
+        log(str(e))
+        return 2
     src = src.resolve()
     out = (args.out or src / "_metadata").expanduser().resolve()
     out.mkdir(parents=True, exist_ok=True)
@@ -96,7 +101,6 @@ def main(argv=None) -> int:
         log(f"No PDFs found in {src}")
         return 1
 
-    llm = LlmIdentifier(args.llm, args.llm_model, args.ollama_url) if args.llm != "none" else None
     settings = Settings(
         unpaywall_email=args.mailto if args.unpaywall else None,
         openalex_api_key=args.openalex_key,
@@ -140,6 +144,8 @@ def main(argv=None) -> int:
     if llm and llm.calls:
         usage = f"LLM fallback used for {llm.calls} PDF(s): {llm.tokens_in} input + {llm.tokens_out} output tokens."
         log(usage)
+    if llm and llm.failures:
+        log(f"LLM fallback failed for {llm.failures} PDF(s)")
 
     # Your notes, from <out>/notes.md, refreshed on every run: a note deleted there disappears here.
     notes = read_notes(out / "notes.md")

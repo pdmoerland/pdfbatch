@@ -7,7 +7,7 @@ from pathlib import Path
 import pymupdf
 import pytest
 
-from pdfbatch import apis, cli, pdf_reader
+from pdfbatch import apis, cli, llm, pdf_reader
 from pdfbatch.identifiers import clean_doi, find_candidates
 from pdfbatch.links import classify, find_links
 from pdfbatch.pdf_reader import PdfContent, read_pdf, unreadable
@@ -476,3 +476,35 @@ def test_duplicate_pdfs_keep_their_paths(pdf_dir, http, tmp_path):
     assert [Path(r.pdf_path).name for r in recs] == ["a_copy.pdf", "b_copy.pdf"]
     assert "Same content as a_copy.pdf." not in recs[0].notes
     assert recs[1].notes.count("Same content as a_copy.pdf.") == 1
+
+
+@pytest.fixture
+def protocol_only(pdf_dir, tmp_path):
+    src = tmp_path / "src"; src.mkdir()
+    (src / "protocol.pdf").write_bytes((pdf_dir / "protocol.pdf").read_bytes())
+    return src
+
+
+def test_llm_without_key_exits_early(protocol_only, http, tmp_path, monkeypatch, capsys):
+    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+    monkeypatch.setattr(cli, "load_dotenv", lambda *a, **k: None)      # keep a developer's .env out
+    assert _run_cli(protocol_only, tmp_path, "--llm", "anthropic") == 2
+    assert "ANTHROPIC_API_KEY" in capsys.readouterr().err
+    assert not list((tmp_path / "out").glob("papers.*"))
+
+
+def test_llm_bad_reply_keeps_record(protocol_only, http, tmp_path, monkeypatch, capsys):
+    class NotJson:
+        status_code, text = 200, "<html>Bad gateway</html>"
+        def raise_for_status(self):
+            pass
+        def json(self):
+            raise ValueError("Expecting value: line 1 column 1 (char 0)")
+
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key")
+    monkeypatch.setattr(llm.requests, "post", lambda *a, **k: NotJson())
+    assert _run_cli(protocol_only, tmp_path, "--llm", "anthropic") == 0
+    [r] = read_json(tmp_path / "out" / "papers.json")
+    assert r.confidence == "unresolved" and r.title.startswith("Internal lab protocol")
+    assert not any(n.startswith("Crashed") for n in r.notes)
+    assert "LLM fallback failed for 1 PDF(s)" in capsys.readouterr().err

@@ -56,28 +56,31 @@ def _parse(text: str) -> Optional[dict]:
 
 class LlmIdentifier:
     def __init__(self, backend: str, model: Optional[str] = None, ollama_url: Optional[str] = None):
+        if backend == "anthropic" and not os.environ.get("ANTHROPIC_API_KEY"):
+            raise ValueError("--llm anthropic needs ANTHROPIC_API_KEY (in the environment or .env)")
         self.backend = backend
         self.model = model
         self.ollama_url = (ollama_url or os.environ.get("OLLAMA_URL") or "http://localhost:11434").rstrip("/")
         self.tokens_in = 0
         self.tokens_out = 0
         self.calls = 0
+        self.failures = 0
 
     def identify(self, page1_text: str) -> Optional[dict]:
+        """A search key, or None. A failed call (network, a reply that is not the expected
+        JSON) costs this PDF its last tier, never the PDF-derived fields it already has."""
         ask = {"anthropic": self._anthropic, "ollama": self._ollama}[self.backend]
         self.calls += 1
         try:
             return ask(page1_text[:MAX_CHARS])
-        except requests.RequestException:
+        except (requests.RequestException, ValueError, KeyError):
+            self.failures += 1
             return None
 
     def _anthropic(self, text: str) -> Optional[dict]:
-        key = os.environ.get("ANTHROPIC_API_KEY")
-        if not key:
-            raise RuntimeError("ANTHROPIC_API_KEY is not set")
         r = requests.post(
             "https://api.anthropic.com/v1/messages",
-            headers={"x-api-key": key, "anthropic-version": "2023-06-01", "content-type": "application/json"},
+            headers={"x-api-key": os.environ["ANTHROPIC_API_KEY"], "anthropic-version": "2023-06-01", "content-type": "application/json"},
             json={
                 "model": self.model or "claude-haiku-4-5",
                 "max_tokens": 200,
