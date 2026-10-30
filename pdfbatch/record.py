@@ -7,7 +7,11 @@ item type and open-access details.
 from __future__ import annotations
 
 from dataclasses import asdict, dataclass, field
-from typing import List, Optional
+from typing import List, Literal, Optional
+
+# The outcome for the PDF: `unresolved` means no API record validated. Not the same
+# vocabulary as pipeline.Verdict, a verdict on one candidate record (`low`: not this PDF).
+Confidence = Literal["high", "medium", "unresolved"]
 
 
 @dataclass
@@ -67,7 +71,7 @@ class Record:
     pdf_path: str = ""
     pdf_sha256: str = ""
     resolved_via: List[str] = field(default_factory=list)   # e.g. ['xmp-doi', 'crossref', 'openalex']
-    confidence: str = "unresolved"      # high | medium | unresolved
+    confidence: Confidence = "unresolved"
     notes: List[str] = field(default_factory=list)          # human-readable warnings
     user_notes: Optional[str] = None    # yours, from notes.md; refreshed on every run
 

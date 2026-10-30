@@ -20,7 +20,7 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Iterator, Optional, Tuple
+from typing import Iterator, Literal, Optional, Tuple
 
 import requests
 from rapidfuzz import fuzz, process
@@ -36,7 +36,10 @@ from .record import Author, OpenAccess, Record
 PREPRINT_DOI_PREFIXES = ("10.1101/", "10.48550/", "10.21203/", "10.20944/", "10.31234/",
                          "10.31219/", "10.36227/", "10.22541/", "10.2139/ssrn")
 
-Hit = Tuple[Optional[dict], str, str]          # (API fields, confidence, how it was found)
+# A verdict is about one API record: does it describe this PDF? `low` means it does not.
+# Not to be confused with Record.confidence, the outcome for the PDF (see record.Confidence).
+Verdict = Literal["high", "medium", "low"]
+Hit = Tuple[Optional[dict], Verdict, str]      # (API fields, verdict, how it was found)
 
 
 @dataclass
@@ -52,10 +55,10 @@ class Settings:
 # validation
 # ---------------------------------------------------------------------------
 
-_RANK = {"low": 0, "medium": 1, "high": 2}
+_RANK: dict[Verdict, int] = {"low": 0, "medium": 1, "high": 2}
 
 
-def _good(confidence: str) -> bool:
+def _good(confidence: Verdict) -> bool:
     return _RANK[confidence] >= _RANK["medium"]
 
 
@@ -75,8 +78,8 @@ def _name_in(pdf: PdfContent, name: str) -> bool:
                for w in name.split())
 
 
-def validate(f: dict, pdf: PdfContent, *, all_authors: bool = False) -> Tuple[str, float]:
-    """Does the API record describe *this* PDF? → (confidence, title score).
+def validate(f: dict, pdf: PdfContent, *, all_authors: bool = False) -> Tuple[Verdict, float]:
+    """Does the API record describe *this* PDF? → (verdict, title score).
 
     `high`: the title is found (≥ 90) and so are the authors; `medium`: the title nearly
     (≥ 75) and the authors; otherwise `low`. "The authors" means one of the first five,
@@ -128,7 +131,7 @@ def _resembles(query: str, title: Optional[str]) -> bool:
 
 
 def _title_search(http: apis.Http, s: Settings, pdf: PdfContent, title: str,
-                  surname: Optional[str] = None) -> Tuple[Optional[dict], str]:
+                  surname: Optional[str] = None) -> Tuple[Optional[dict], Verdict]:
     """CrossRef, then OpenAlex: the best hit that resembles `title` and validates.
 
     OpenAlex is asked whenever CrossRef has nothing *usable*, not only nothing at all:
@@ -148,7 +151,7 @@ def _title_search(http: apis.Http, s: Settings, pdf: PdfContent, title: str,
 
 
 def _lookup(http: apis.Http, s: Settings, pdf: PdfContent, doi: Optional[str], title: Optional[str],
-            surname: Optional[str] = None) -> Tuple[Optional[dict], str]:
+            surname: Optional[str] = None) -> Tuple[Optional[dict], Verdict]:
     """A proposed DOI if it validates, else a search for the proposed title."""
     doi = clean_doi(doi) if doi else None
     if doi and (f := _resolve(http, s, "doi", doi)) and _good(conf := validate(f, pdf)[0]):
