@@ -18,7 +18,7 @@ Found while fixing iteration 12: for `baggerly_prodcon.pdf` the title guess was 
 
 ## Why not just raise the limit
 
-Measured on the 94 PDFs of the `_PDM/Reader` folders and `Downloads/papers`: at 2.6 or 3.0 the Baggerly title is whole, but `Knij04a.pdf` loses its title guess altogether. It is a Word manuscript typed in 11.3 pt throughout, with blank lines between paragraphs, and the same 2.3-size gap that separates its title from the authors would let the run carry on through authors and affiliations until it is too long to be a title.
+Measured on the 94 PDFs of two reading lists and a folder of recent downloads: at 2.6 or 3.0 the Baggerly title is whole, but `Knij04a.pdf` loses its title guess altogether. It is a Word manuscript typed in 11.3 pt throughout, with blank lines between paragraphs, and the same 2.3-size gap that separates its title from the authors would let the run carry on through authors and affiliations until it is too long to be a title.
 
 ## Fix
 
@@ -28,10 +28,10 @@ Allow up to 3.0 sizes between title lines only for a display font, one at least 
 
 ## Result
 
-Both Reader folders (92 PDFs) rerun with `--force` and compared field by field with iteration 12's run: one record changed. `baggerly_prodcon.pdf` is now titled "Are the NCI/FDA Ovarian Proteomic Data Biased? A Reply to “Producers and Consumers”"; it stays unresolved with its near-miss note.
+Both reading lists (92 PDFs) rerun with `--force` and compared field by field with iteration 12's run: one record changed. `baggerly_prodcon.pdf` is now titled "Are the NCI/FDA Ovarian Proteomic Data Biased? A Reply to “Producers and Consumers”"; it stays unresolved with its near-miss note.
 
 ## Done when
 
 - Test first, then the fix, one commit; `uv run pytest` and Ruff pass.
-- The Reader folders rerun with `--force` into a separate folder: only `baggerly_prodcon.pdf` changes, to its full title.
+- The reading lists rerun with `--force` into a separate folder: only `baggerly_prodcon.pdf` changes, to its full title.
 - `design_decisions_and_rationale.md` (title guess paragraph) and the history table updated; `status: completed`.

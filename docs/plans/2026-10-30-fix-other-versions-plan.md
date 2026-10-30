@@ -10,7 +10,7 @@ iteration: 12
 
 Oct 30, 2026 · @Perry Moerland
 
-Two misidentifications from a real run (`_PDM/Reader`, 92 PDFs), both breaking the rule that a record describes the PDF you hold.
+Two misidentifications from a real run (two reading lists, 92 PDFs), both breaking the rule that a record describes the PDF you hold.
 
 ## Fix 1: a DOI the PDF names as another version is not its own
 
@@ -30,7 +30,7 @@ Deliberately *not* a cue: "preprint". bioRxiv stamps every page with "bioRxiv pr
 
 **Fix:** `_title_search` returns a hit only when it is `high`. The best `medium` hit is kept as a near miss: if nothing else identifies the PDF, it stays unresolved with the note "Possibly another version of this PDF: "<title>" (<link>); its title differs." Nothing from the near miss is merged. DOI lookups (tiers 1–2, and the DOI half of GROBID/LLM keys) keep accepting `medium`.
 
-This changes a validation rule. There is no local gold set, so it is checked by rerunning the `_PDM/Reader` folders and comparing: only `baggerly_prodcon.pdf` was a `medium` title-search result there.
+This changes a validation rule. There is no local gold set, so it is checked by rerunning the two reading lists and comparing: only `baggerly_prodcon.pdf` was a `medium` title-search result there.
 
 **Test:** a PDF whose CrossRef search hit has the same authors and a nearly matching title → unresolved, with the near-miss note.
 
@@ -40,10 +40,10 @@ The title guess for `baggerly_prodcon.pdf` keeps only the first line of a two-li
 
 ## Result
 
-Both Reader folders (92 PDFs) rerun with `--force` into a separate folder and compared field by field with the earlier run: exactly two records changed. `conservation_tavazoie.pdf` now has `10.1371/journal.pcbi.0010069` (and the final title) with a note naming the `.eor` DOI; `baggerly_prodcon.pdf` is unresolved with the near-miss note.
+Both reading lists (92 PDFs) rerun with `--force` into a separate folder and compared field by field with the earlier run: exactly two records changed. `conservation_tavazoie.pdf` now has `10.1371/journal.pcbi.0010069` (and the final title) with a note naming the `.eor` DOI; `baggerly_prodcon.pdf` is unresolved with the near-miss note.
 
 ## Done when
 
 - One commit per fix, test first; `uv run pytest` and Ruff pass.
 - `design_decisions_and_rationale.md` (scoring table, validation rules, preprints section) and the history table updated; `status: completed`.
-- The two Reader folders rerun with `--force` into a separate folder: `conservation_tavazoie.pdf` gets `10.1371/journal.pcbi.0010069`, `baggerly_prodcon.pdf` is unresolved with the note, and nothing else changes.
+- The two reading lists rerun with `--force` into a separate folder: `conservation_tavazoie.pdf` gets `10.1371/journal.pcbi.0010069`, `baggerly_prodcon.pdf` is unresolved with the note, and nothing else changes.

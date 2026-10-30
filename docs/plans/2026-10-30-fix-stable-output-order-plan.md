@@ -23,10 +23,10 @@ No field changes; only the order of records in `papers.json`, and of tied record
 
 ## Result
 
-`d8932cf`. 70 tests and Ruff pass. The Reader folders (92 PDFs) give the same records as before, and two runs now write byte-identical `papers.json` and `papers.ris`.
+`d8932cf`. 70 tests and Ruff pass. The reading lists (92 PDFs) give the same records as before, and two runs now write byte-identical `papers.json` and `papers.ris`.
 
 ## Done when
 
 - Test first, then the fix, one commit; `uv run pytest` and Ruff pass.
-- The Reader folders, run twice with `--force`, give byte-identical `papers.json`, and the same records as before.
+- The reading lists, run twice with `--force`, give byte-identical `papers.json`, and the same records as before.
 - `design_decisions_and_rationale.md` ("Outputs") and the history table updated; `status: completed`.

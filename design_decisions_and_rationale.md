@@ -253,9 +253,9 @@ All HTTP goes through one shared `Http` instance ([`apis.py`](pdfbatch/apis.py))
 - **User-Agent** with `mailto:`. This gets CrossRef and OpenAlex "polite pool" treatment, which is why `--mailto` / `CONTACT_MAILTO` is required.
 - **Throttling** per host: 0.12 s between requests in general, and 3 s for arXiv, as its API terms ask. Each worker thread reserves its own slot under a lock and sleeps outside it, so two threads never hit a host at once and a wait for one host does not hold up the others.
 - **Retries** on 429/5xx with exponential backoff, honouring `Retry-After` up to 60 s: a server asking for an hour must not stall a worker that long.
-- **A 30-day disk cache** in one per-user folder (`PDFBATCH_CACHE_DIR`, else `%LOCALAPPDATA%\pdfbatch\Cache`, `~/Library/Caches/pdfbatch` or `~/.cache/pdfbatch`), shared by runs from any folder and kept out of synced project folders. 404s are cached too, so reruns and repeated lookups are nearly free. API keys are sent but are not part of cache keys, so they are never written to the cache file.
+- **A 30-day disk cache** in one per-user folder (`PDFBATCH_CACHE_DIR`, else `%LOCALAPPDATA%\pdfbatch\Cache`, `~/Library/Caches/pdfbatch` or `~/.cache/pdfbatch`), shared by runs from any folder and kept out of synced project folders. 404s are cached too, so reruns and repeated lookups are nearly free, but for one day only: a DOI unknown today (an accepted manuscript can print its DOI before it is registered) may resolve next week, and `--retry-unresolved` should see that. API keys are sent but are not part of cache keys, so they are never written to the cache file.
 
-PDFs are processed by four worker threads by default (`--workers`). The work is network-bound, and the shared throttle keeps parallelism polite.
+PDFs are processed by four worker threads by default (`--workers`). The work is network-bound, and the shared throttle keeps parallelism polite. PyMuPDF does not support use from several threads, not even with separate documents, so `read_pdf` holds one lock: PDFs are read one at a time, their lookups in parallel.
 
 ---
 
@@ -308,3 +308,4 @@ Principles applied in [iteration 4](docs/plans/2026-10-02-refactor-minimal-elega
 | 14 | [One definition per idea](docs/plans/2026-10-30-refactor-one-definition-per-idea-plan.md) | `c79f7b6` … `7ae9ca7` |
 | 15 | [Stable output order](docs/plans/2026-10-30-fix-stable-output-order-plan.md) | `d8932cf` |
 | 16 | [Unpaywall by default](docs/plans/2026-10-30-feat-unpaywall-by-default-plan.md) | `7d21633` |
+| 17 | [PyMuPDF lock, short-lived 404s, checked field names](docs/plans/2026-10-30-fix-threads-and-negative-cache-plan.md) | `4988a8a`, `3d47e14`, `d108b71` |

@@ -32,14 +32,14 @@ A review of the whole package in the spirit of Dijkstra's "Beauty is our busines
 ## How behaviour is kept intact
 
 - `uv run pytest` and Ruff after every commit.
-- Both `_PDM/Reader` folders (92 PDFs) rerun with `--force` (through the cache) before and after, and the full `papers.json` and `papers.ris` compared; `papers.md` compared without its timestamp line.
+- Both reading lists (92 PDFs) rerun with `--force` (through the cache) before and after, and the full `papers.json` and `papers.ris` compared; `papers.md` compared without its timestamp line.
 - `pdf-batch --help` and `bench/run_benchmark.py run --help` checked by eye: same options, same defaults.
 
 ## Result
 
-Seven commits, `c79f7b6` … `7ae9ca7`. 69 tests and Ruff pass after each. The Reader comparison (92 PDFs; `papers.json` as a set of records, since its order follows completion; `papers.ris` byte for byte; `papers.md` without its timestamp line) was identical to the baseline after every commit that touched lookups, API parsing, links or identifiers. `pdf-batch --help` lists the same options; the lookup options now come before `--unpaywall`, and the benchmark's `--help` gains the CLI's help texts.
+Seven commits, `c79f7b6` … `7ae9ca7`. 69 tests and Ruff pass after each. The comparison on the reading lists (92 PDFs; `papers.json` as a set of records, since its order follows completion; `papers.ris` byte for byte; `papers.md` without its timestamp line) was identical to the baseline after every commit that touched lookups, API parsing, links or identifiers. `pdf-batch --help` lists the same options; the lookup options now come before `--unpaywall`, and the benchmark's `--help` gains the CLI's help texts.
 
 ## Done when
 
-- Seven commits, tests and Ruff green, the Reader comparison identical.
+- Seven commits, tests and Ruff green, the comparison on the reading lists identical.
 - History table row 14; `status: completed`.
