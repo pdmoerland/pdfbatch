@@ -4,7 +4,9 @@ from __future__ import annotations
 
 import datetime as dt
 import json
+import os
 import re
+import tempfile
 from pathlib import Path
 from typing import Dict, Iterable, List
 
@@ -35,6 +37,22 @@ def _one_line(s: str) -> str:
 def sort_key(r: Record):
     first = (r.authors[0].family or r.authors[0].literal) if r.authors else ""
     return ((first or "~").lower(), r.year or "", (r.title or "").lower())
+
+
+def _write_atomic(path: Path, text: str, *, newline: str | None = None) -> None:
+    """Write via a temp file in the same folder, then rename: an interrupted run must
+    not leave a truncated papers.json, the source of truth for the next run."""
+    fh = tempfile.NamedTemporaryFile("w", encoding="utf-8", newline=newline, dir=path.parent,
+                                     prefix=f".{path.name}.", suffix=".tmp", delete=False)
+    try:
+        with fh:
+            fh.write(text)
+            fh.flush()
+            os.fsync(fh.fileno())
+        os.replace(fh.name, path)
+    except BaseException:
+        Path(fh.name).unlink(missing_ok=True)
+        raise
 
 
 def _oa_details(r: Record) -> str:
@@ -160,7 +178,7 @@ def write_ris(records: Iterable[Record], path: Path, *, preprint_type: str = "JO
               attach: str = "uri", bom: bool = False) -> None:
     text = "".join(ris_entry(r, preprint_type=preprint_type, attach=attach)
                    for r in sorted(records, key=sort_key))
-    path.write_text(("﻿" if bom else "") + text, encoding="utf-8", newline="")
+    _write_atomic(path, ("﻿" if bom else "") + text, newline="")
 
 
 # ---------------------------------------------------------------------------
@@ -205,7 +223,7 @@ def write_markdown(records: List[Record], path: Path, *, llm_usage: str = "") ->
     out += ["## Papers", ""]
     for r in recs:
         out += _md_entry(r)
-    path.write_text("\n".join(out), encoding="utf-8")
+    _write_atomic(path, "\n".join(out))
 
 
 # ---------------------------------------------------------------------------
@@ -213,8 +231,7 @@ def write_markdown(records: List[Record], path: Path, *, llm_usage: str = "") ->
 # ---------------------------------------------------------------------------
 
 def write_json(records: List[Record], path: Path) -> None:
-    path.write_text(json.dumps([r.to_dict() for r in records], indent=2, ensure_ascii=False),
-                    encoding="utf-8")
+    _write_atomic(path, json.dumps([r.to_dict() for r in records], indent=2, ensure_ascii=False))
 
 
 def read_json(path: Path) -> List[Record]:

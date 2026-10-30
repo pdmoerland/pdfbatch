@@ -8,13 +8,13 @@ from pathlib import Path
 import pymupdf
 import pytest
 
-from pdfbatch import apis, cli, llm, pdf_reader
+from pdfbatch import apis, cli, llm, pdf_reader, writers
 from pdfbatch.identifiers import clean_doi, find_candidates
 from pdfbatch.links import classify, find_links
 from pdfbatch.pdf_reader import PdfContent, read_pdf, unreadable
 from pdfbatch.pipeline import Settings, _name_in, _resembles, process_pdf, validate
 from pdfbatch.record import Author, Record
-from pdfbatch.writers import apa, read_json, read_notes, ris_entry, write_markdown
+from pdfbatch.writers import apa, read_json, read_notes, ris_entry, write_json, write_markdown
 
 from . import fixtures
 
@@ -573,3 +573,20 @@ def test_benchmark_scoring():
                        confidence="high", resolved_via=["doi:page1-header"])
     after = score(gold, [r for r in records if r.pdf_sha256 != "f"] + [published])
     assert changes(s, after) == [("f.pdf", "correct", "wrong")]
+
+
+# --------------------------------------------------------------------------- review fixes
+
+def test_json_write_is_atomic(tmp_path, monkeypatch):
+    path = tmp_path / "papers.json"
+    write_json([Record(pdf_path="a.pdf", title="A")], path)
+    before = path.read_bytes()
+
+    def broken(*a, **k):
+        raise OSError("disk full")
+
+    monkeypatch.setattr(writers.os, "fsync", broken)      # fails after the temp file is half written
+    with pytest.raises(OSError):
+        write_json([Record(pdf_path="b.pdf", title="B")], path)
+    assert path.read_bytes() == before
+    assert [p.name for p in tmp_path.iterdir()] == ["papers.json"]
