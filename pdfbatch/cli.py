@@ -75,6 +75,18 @@ def _mark_duplicates(records) -> None:
             r.notes.append(f"{_SAME_CONTENT}{Path(orig.pdf_path).name}.")
 
 
+def _read_known(json_path: Path, log) -> list[Record]:
+    """Records from the last run. An unreadable file is kept as `.bak`, not overwritten
+    unseen, and every PDF is processed again."""
+    try:
+        return read_json(json_path)
+    except ValueError as e:
+        bak = json_path.with_name(json_path.name + ".bak")
+        json_path.replace(bak)
+        log(f"{json_path.name} could not be read ({e}); kept it as {bak.name} and reprocessing every PDF.")
+        return []
+
+
 def main(argv=None) -> int:
     load_dotenv(find_dotenv(usecwd=True))      # nearest .env from the cwd up
     args = _arguments(argv)
@@ -111,7 +123,7 @@ def main(argv=None) -> int:
 
     # Reruns are incremental: PDFs are keyed by content, so renamed files are recognised.
     json_path = out / f"{args.name}.json"
-    known = {} if args.force else {r.pdf_sha256: r for r in read_json(json_path)}
+    known = {} if args.force else {r.pdf_sha256: r for r in _read_known(json_path, log)}
     records, todo, hashes = [], [], {p: sha256_file(p) for p in pdfs}
     for p in pdfs:
         rec = known.get(hashes[p])

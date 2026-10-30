@@ -235,12 +235,14 @@ def write_json(records: List[Record], path: Path) -> None:
 
 
 def read_json(path: Path) -> List[Record]:
+    """The records of an earlier run; none if there was none. A file that cannot be read
+    raises ValueError: silently starting over would hide why a rerun takes an hour."""
     if not path.exists():
         return []
     try:
         return [Record.from_dict(d) for d in json.loads(path.read_text(encoding="utf-8"))]
-    except (ValueError, TypeError):
-        return []
+    except (ValueError, TypeError) as e:
+        raise ValueError(f"{path}: {e}") from e
 
 
 # ---------------------------------------------------------------------------

@@ -590,3 +590,13 @@ def test_json_write_is_atomic(tmp_path, monkeypatch):
         write_json([Record(pdf_path="b.pdf", title="B")], path)
     assert path.read_bytes() == before
     assert [p.name for p in tmp_path.iterdir()] == ["papers.json"]
+
+
+def test_corrupt_json_is_kept_and_reported(protocol_only, http, tmp_path, capsys):
+    out = tmp_path / "out"
+    out.mkdir()
+    (out / "papers.json").write_text("[{", encoding="utf-8")
+    assert _run_cli(protocol_only, tmp_path) == 0
+    assert (out / "papers.json.bak").read_text(encoding="utf-8") == "[{"
+    assert len(read_json(out / "papers.json")) == 1
+    assert "papers.json could not be read" in capsys.readouterr().err
