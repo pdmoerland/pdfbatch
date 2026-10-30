@@ -10,7 +10,7 @@ import pymupdf
 import pytest
 
 from pdfbatch import apis, cli, llm, pdf_reader, pipeline, writers
-from pdfbatch.identifiers import clean_doi, find_candidates
+from pdfbatch.identifiers import clean_doi, find_candidates, other_version_dois
 from pdfbatch.links import classify, find_links
 from pdfbatch.pdf_reader import PdfContent, read_pdf, unreadable
 from pdfbatch.pipeline import Settings, _name_in, _resembles, process_pdf, validate
@@ -131,6 +131,27 @@ def test_header_doi_outranks_cited_doi(pdf_dir):
     c = find_candidates(read_pdf(pdf_dir / "doe2024_zebrafish.pdf"))
     assert c[0].value == "10.1038/s41592-024-02201-0"
     assert c[0].source == "page1-header"
+
+
+def test_doi_of_another_version_is_not_a_candidate():
+    # PLoS Comput Biol 2005: the footnote names the Early Online Release, a DOI of its own.
+    footnote = ("* A previous version of this article appeared as an Early Online Release on November\n"
+                "2, 2005 (DOI: 10.1371/journal.pcbi.0010069.eor).")
+    page1 = ("Received July 8, 2005; Accepted November 2, 2005; Published December 9, 2005\n"
+             "DOI: 10.1371/journal.pcbi.0010069\n" + footnote)
+    pdf = PdfContent(path=Path("x.pdf"), sha256="", info={}, xmp="", page_texts=[page1],
+                     header_footer_text=footnote, title_guesses=[])
+    assert [c.value for c in find_candidates(pdf)] == ["10.1371/journal.pcbi.0010069"]
+    assert other_version_dois(pdf) == ["10.1371/journal.pcbi.0010069.eor"]
+    rec = Record(doi="10.1371/journal.pcbi.0010069")
+    pipeline.note_other_version(rec, pdf)
+    assert rec.notes == ["Other version named in the PDF: https://doi.org/10.1371/journal.pcbi.0010069.eor"]
+    # bioRxiv stamps its own DOI as "bioRxiv preprint doi: …": "preprint" is no cue.
+    stamp = "bioRxiv preprint doi: https://doi.org/10.1101/2024.03.15.585123; this version posted March 17, 2024."
+    pdf = PdfContent(path=Path("x.pdf"), sha256="", info={}, xmp="", page_texts=[stamp],
+                     header_footer_text=stamp, title_guesses=[])
+    assert [c.value for c in find_candidates(pdf)] == ["10.1101/2024.03.15.585123"]
+    assert other_version_dois(pdf) == []
 
 
 def test_title_guess(pdf_dir):

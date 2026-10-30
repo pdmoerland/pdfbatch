@@ -28,7 +28,7 @@ from rapidfuzz import fuzz, process
 from rapidfuzz.distance import Levenshtein
 
 from . import apis
-from .identifiers import clean_doi, find_candidates
+from .identifiers import clean_doi, find_candidates, other_version_dois
 from .links import LinkChecker, find_links
 from .llm import LlmIdentifier
 from .pdf_reader import PdfContent, abstract_from_text, normalize, read_pdf
@@ -242,15 +242,16 @@ def identify(http: apis.Http, s: Settings, pdf: PdfContent, rec: Record) -> None
 # other versions and enrichment
 # ---------------------------------------------------------------------------
 
-def note_other_version(rec: Record) -> None:
-    """Point to the paper's other version; never cite it. The record describes the PDF you
+def note_other_version(rec: Record, pdf: PdfContent) -> None:
+    """Point to the paper's other versions; never cite them. The record describes the PDF you
     hold: a preprint stays a preprint even when its journal version is out."""
-    if not rec.related_doi:
-        return
-    if rec.related_relation == "has-preprint":
+    if rec.related_doi and rec.related_relation == "has-preprint":
         rec.notes.append(f"Preprint version: https://doi.org/{rec.related_doi}")
-    else:
+    elif rec.related_doi:
         rec.notes.append(f"Published version exists: https://doi.org/{rec.related_doi}")
+    for doi in other_version_dois(pdf):        # "A previous version … appeared as … (DOI: …)"
+        if doi not in (rec.doi, rec.related_doi):
+            rec.notes.append(f"Other version named in the PDF: https://doi.org/{doi}")
 
 
 def enrich(http: apis.Http, s: Settings, pdf: PdfContent, rec: Record) -> None:
@@ -306,7 +307,7 @@ def process_pdf(path: Path, http: apis.Http, s: Settings, sha256: str | None = N
     if pdf.ocr:
         rec.notes.append("No usable text layer: page 1 was read by OCR.")
     identify(http, s, pdf, rec)
-    note_other_version(rec)
+    note_other_version(rec, pdf)
     enrich(http, s, pdf, rec)
     rec.links = find_links(pdf, s.link_checker)
     return rec

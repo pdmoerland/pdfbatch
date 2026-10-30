@@ -85,10 +85,36 @@ def _before_references(text: str) -> str:
     return text[: m.start()] if m else text
 
 
+# Words that introduce *another* version of the article ("A previous version of this article
+# appeared as an Early Online Release (DOI: ….eor)"). Not "preprint": bioRxiv stamps the
+# PDF's own DOI as "bioRxiv preprint doi: …".
+_OTHER_VERSION_RE = re.compile(
+    r"\b(?:(?:previous|earlier|original)\s+version|early\s+online\s+release"
+    r"|(?:originally|previously)\s+(?:published|appeared))\b", re.I)
+
+
+def _other_versions_in(text: str) -> list[str]:
+    """DOIs in the rest of the sentence after an other-version cue."""
+    out = []
+    for m in _OTHER_VERSION_RE.finditer(text):
+        sentence = re.split(r"\.\s+(?=[A-Z*])", text[m.end():m.end() + 300], maxsplit=1)[0]
+        out += _dois_in(sentence)
+    return out
+
+
+def other_version_dois(pdf: PdfContent) -> list[str]:
+    """DOIs page 1 names as another version of this article: noted, never its own DOI."""
+    p1 = _before_references(pdf.page_texts[0]) if pdf.page_texts else ""
+    return list(dict.fromkeys(_other_versions_in(pdf.header_footer_text) + _other_versions_in(p1)))
+
+
 def find_candidates(pdf: PdfContent) -> list[Candidate]:
     cands: list[Candidate] = []
+    others = set(other_version_dois(pdf))
 
     def add(kind, value, source, score):
+        if value in others:
+            return
         for c in cands:
             if c.kind == kind and c.value == value:
                 c.score = max(c.score, score) + 0.05      # seen in several places
