@@ -12,6 +12,7 @@ import diskcache
 import requests
 
 from . import __version__
+from .apis import CACHE_TTL
 from .identifiers import REFS_HEADING_RE
 from .pdf_reader import PdfContent
 from .record import Link
@@ -201,9 +202,8 @@ def labels(text: str, links: Sequence[Found], window: int = 200) -> dict[str, st
 class LinkChecker:
     """HEAD-checks links on platforms where content can disappear; cached for 30 days."""
 
-    def __init__(self, cache_dir: Path, ttl_days: int = 30, timeout: float = 3.0):
+    def __init__(self, cache_dir: Path, timeout: float = 3.0):
         self.cache = diskcache.Cache(str(cache_dir))
-        self.ttl = ttl_days * 86400
         self.timeout = timeout
 
     def alive(self, f: Found) -> bool:
@@ -212,7 +212,7 @@ class LinkChecker:
         ok = self.cache.get(f.url)
         if ok is None:
             ok = self._head(f.url)
-            self.cache.set(f.url, ok, expire=self.ttl)
+            self.cache.set(f.url, ok, expire=CACHE_TTL)
         return ok
 
     def _head(self, url: str) -> bool:

@@ -27,6 +27,7 @@ from . import __version__
 from .record import Author, OpenAccess
 
 _RETRY = {429, 500, 502, 503, 504}
+CACHE_TTL = 30 * 86400                  # seconds: API responses and link checks
 MAX_RETRY_AFTER = 60.0                 # seconds; a server's "Retry-After: 3600" must not stall a worker
 _UNCACHED_PARAMS = {"api_key"}          # sent, but never written to the cache file
 
@@ -54,10 +55,9 @@ def _retry_after(value: str | None, default: float) -> float:
 class Http:
     """requests + diskcache + polite headers + backoff. One instance per run."""
 
-    def __init__(self, mailto: str, cache_dir: Path | None, ttl_days: int = 30, timeout: int = 20):
+    def __init__(self, mailto: str, cache_dir: Path | None, timeout: int = 20):
         self.mailto = mailto
         self.timeout = timeout
-        self.ttl = ttl_days * 86400
         self.session = requests.Session()
         self.session.headers["User-Agent"] = f"pdfbatch/{__version__} (mailto:{mailto})"
         self.cache = diskcache.Cache(str(cache_dir)) if cache_dir else None
@@ -99,7 +99,7 @@ class Http:
                 continue
             if r.status_code == 404:
                 if self.cache is not None:
-                    self.cache.set(key, "__404__", expire=self.ttl)
+                    self.cache.set(key, "__404__", expire=CACHE_TTL)
                 return None
             if r.status_code in _RETRY and attempt < retries:
                 time.sleep(_retry_after(r.headers.get("Retry-After"), delay))
@@ -112,7 +112,7 @@ class Http:
             except ValueError:
                 return None
             if self.cache is not None:
-                self.cache.set(key, body, expire=self.ttl)
+                self.cache.set(key, body, expire=CACHE_TTL)
             return body
         return None
 
