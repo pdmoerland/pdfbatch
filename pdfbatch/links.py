@@ -45,12 +45,17 @@ class Found:
         return self.platform.kind
 
 
+def _trim(url: str) -> str:
+    """Without fragment, query or trailing slash."""
+    return url.split("#", 1)[0].split("?", 1)[0].rstrip("/")
+
+
 def _canon(pattern: str, template: str) -> Callable[[str], str]:
     """Canonicaliser: fill `template` with the groups of `pattern`, else return the URL as is."""
     rx = re.compile(pattern, re.I)
 
     def canonical(url: str) -> str:
-        url = url.split("#", 1)[0].split("?", 1)[0].rstrip("/")
+        url = _trim(url)
         m = rx.search(url)
         return template.format(*m.groups()) if m else url
     return canonical
@@ -58,7 +63,7 @@ def _canon(pattern: str, template: str) -> Callable[[str], str]:
 
 def _gitlab(url: str) -> str:
     """GitLab nests groups (`/a/b/c/repo`); `/-/` starts a sub-path (tree, issues, …)."""
-    url = re.sub(r"/-(?:/.*)?$", "", url.split("#", 1)[0].split("?", 1)[0].rstrip("/"))
+    url = re.sub(r"/-(?:/.*)?$", "", _trim(url))
     m = re.search(r"gitlab\.com/((?:[^/]+/){1,3}[^/]+)", url, re.I)
     return f"https://gitlab.com/{m.group(1).rstrip('/-')}" if m else url
 
@@ -151,8 +156,8 @@ def extract(text: str) -> list[Found]:
 _TAGS = ["Code", "Data", "Dataset", "Datasets", "Model", "Models", "Weights", "Repo", "Repository",
          "Website", "Project page", "Project", "HuggingFace", "GitHub", "GitLab", "Bitbucket",
          "Codeberg", "Zenodo", "Demo", "Checkpoints"]
-_TAG_RE = re.compile(r"\b(?P<label>{})\s*[:\-–]\s*<?(?P<url>https?://\S+)"
-                     .format("|".join(sorted(map(re.escape, _TAGS), key=len, reverse=True))), re.I)
+_TAG = "|".join(sorted(map(re.escape, _TAGS), key=len, reverse=True))     # longest first: "Project page"
+_TAG_RE = re.compile(rf"\b(?P<label>{_TAG})\s*[:\-–]\s*<?(?P<url>https?://\S+)", re.I)
 _TRIGGERS = [(re.compile(rx, re.I), label) for rx, label in [      # most specific first
     (r"\bCode\s+(?:is|are|will\s+be)?\s*available\s+at\b", "Code"),
     (r"\bCode\s+availability\b", "Code"),
@@ -235,7 +240,7 @@ _STATEMENT = re.compile(
     r"can be (?:found|accessed|downloaded|obtained))\b"
     r"|\b(?:(?:downloaded|obtained|retrieved|taken|adapted) from|provided (?:at|by|in)|based on|implemented in)\b",
     re.I)
-_TAG_BEFORE = re.compile(r"\b(?:{})\s*[:\-–]\s*<?$".format("|".join(map(re.escape, _TAGS))), re.I)
+_TAG_BEFORE = re.compile(rf"\b(?:{_TAG})\s*[:\-–]\s*<?$", re.I)
 
 
 def _claimed(text: str, i: int, window: int = 300) -> bool:
