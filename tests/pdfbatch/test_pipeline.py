@@ -8,7 +8,7 @@ from pathlib import Path
 import pymupdf
 import pytest
 
-from pdfbatch import apis, cli, llm, pdf_reader, writers
+from pdfbatch import apis, cli, llm, pdf_reader, pipeline, writers
 from pdfbatch.identifiers import clean_doi, find_candidates
 from pdfbatch.links import classify, find_links
 from pdfbatch.pdf_reader import PdfContent, read_pdf, unreadable
@@ -638,3 +638,14 @@ def test_default_cache_dir(tmp_path, monkeypatch):
     monkeypatch.setattr(apis.sys, "platform", "linux")
     monkeypatch.setenv("XDG_CACHE_HOME", str(tmp_path / "xdg"))
     assert apis.default_cache_dir() == tmp_path / "xdg" / "pdfbatch"
+
+
+def test_validate_checks_at_most_five_authors(pdf_dir, monkeypatch):
+    calls = []
+    real = pipeline._name_in
+    monkeypatch.setattr(pipeline, "_name_in", lambda pdf, name: calls.append(name) or real(pdf, name))
+    pdf = read_pdf(pdf_dir / "doe2024_zebrafish.pdf")
+    f = {"title": "Single-cell atlas of regulatory syntax in the developing zebrafish heart",
+         "authors": [Author("X")] + [Author(f"Physicist{i:04d}", "A") for i in range(1000)]}
+    assert validate(f, pdf)[0] == "low"
+    assert calls == [f"physicist{i:04d}" for i in range(5)]       # the one-letter name is skipped first

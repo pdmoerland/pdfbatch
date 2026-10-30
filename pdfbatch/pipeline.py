@@ -86,10 +86,12 @@ def validate(f: dict, pdf: PdfContent, *, all_authors: bool = False) -> Tuple[st
     """
     title = normalize(f.get("title"))
     score = fuzz.partial_ratio(title, pdf.head) if pdf.head and len(title.split()) >= 3 else 0.0
-    found = [_name_in(pdf, s)
-             for s in (normalize(a.family or a.literal.split(" ")[-1]) for a in f.get("authors") or [])
+    names = [s for s in (normalize(a.family or a.literal.split(" ")[-1]) for a in f.get("authors") or [])
              if len(s) > 1]                    # a one-letter "family name" is a data error, not checkable
-    named = bool(found) and (all(found) if all_authors else any(found[:5]))
+    if not all_authors:
+        names = names[:5]                      # checked before matching: physics papers list thousands
+    found = (_name_in(pdf, s) for s in names)
+    named = bool(names) and (all(found) if all_authors else any(found))
     if named and score >= 90:
         return "high", score
     if named and score >= 75:
