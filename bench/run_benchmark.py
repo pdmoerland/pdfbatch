@@ -12,7 +12,6 @@ from __future__ import annotations
 import argparse
 import csv
 import json
-import os
 import subprocess
 import sys
 from collections import Counter, defaultdict
@@ -23,11 +22,10 @@ from pathlib import Path
 
 from dotenv import find_dotenv, load_dotenv
 
-from pdfbatch import apis
+from pdfbatch.cli import add_lookup_options, check_lookup_options, make_llm, make_lookup
 from pdfbatch.identifiers import clean_doi
-from pdfbatch.llm import LlmIdentifier
 from pdfbatch.pdf_reader import sha256_file
-from pdfbatch.pipeline import Settings, process_pdf
+from pdfbatch.pipeline import process_pdf
 from pdfbatch.record import Record
 
 FIELDS = ["sha256", "file", "doi", "status", "comment"]
@@ -99,8 +97,7 @@ def changes(old: dict, new: dict) -> list[tuple]:
 
 def _process(pdfs: dict[str, Path], args) -> list[Record]:
     """process_pdf on each PDF, with the CLI's Settings and HTTP cache."""
-    settings = Settings(openalex_api_key=args.openalex_key, grobid_url=args.grobid, llm=args.llm_tier)
-    http = apis.Http(args.mailto, args.cache_dir / "http")
+    http, settings = make_lookup(args, args.llm_tier)
 
     def one(item):
         h, p = item
@@ -217,27 +214,18 @@ def main(argv=None) -> int:
         p = sub.add_parser(name, help=helptext)
         p.add_argument("--pdfs", type=Path, required=True, help="folder of PDFs (searched recursively)")
         p.add_argument("--gold", type=Path, required=True, help="gold CSV (see bench/gold.example.csv)")
-        p.add_argument("--mailto", default=os.environ.get("CONTACT_MAILTO"))
-        p.add_argument("--openalex-key", default=os.environ.get("OPENALEX_API_KEY"))
-        p.add_argument("--grobid", metavar="URL")
-        p.add_argument("--llm", choices=["none", "anthropic", "ollama"], default="none")
-        p.add_argument("--llm-model")
-        p.add_argument("--ollama-url")
-        p.add_argument("--workers", type=int, default=4)
-        p.add_argument("--cache-dir", type=Path, help="default: the CLI's (env PDFBATCH_CACHE_DIR or the per-user cache)")
+        add_lookup_options(p)
         if name == "run":
             p.add_argument("--compare", type=Path, metavar="RESULT.json", help="list PDFs whose outcome changed")
             p.add_argument("--max-wrong", type=int, metavar="N", help="exit 1 when more than N are wrong")
     args = ap.parse_args(argv)
-    args.cache_dir = args.cache_dir or apis.default_cache_dir()
-    if not args.mailto:
-        ap.error("--mailto (or CONTACT_MAILTO) is required by the CrossRef/OpenAlex polite pools")
+    check_lookup_options(ap, args)
     if not args.pdfs.is_dir():
         ap.error(f"not a folder: {args.pdfs}")
     if args.command == "run" and not args.gold.exists():
         ap.error(f"no gold file: {args.gold} (create one with `init`)")
     try:
-        args.llm_tier = LlmIdentifier(args.llm, args.llm_model, args.ollama_url) if args.llm != "none" else None
+        args.llm_tier = make_llm(args)
     except ValueError as e:                    # --llm anthropic without a key
         print(e, file=sys.stderr)
         return 2

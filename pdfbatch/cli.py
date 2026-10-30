@@ -25,6 +25,46 @@ from .record import Record
 from .writers import read_json, read_notes, write_json, write_markdown, write_ris
 
 
+# ---------------------------------------------------------------------------
+# How PDFs are looked up: shared with bench/run_benchmark.py, which must run
+# pdfbatch exactly as the CLI does.
+# ---------------------------------------------------------------------------
+
+def add_lookup_options(ap: argparse.ArgumentParser) -> None:
+    ap.add_argument("--mailto", default=os.environ.get("CONTACT_MAILTO"),
+                    help="contact e-mail for CrossRef/OpenAlex polite pools (env CONTACT_MAILTO)")
+    ap.add_argument("--openalex-key", default=os.environ.get("OPENALEX_API_KEY"))
+    ap.add_argument("--grobid", metavar="URL", help="GROBID server, e.g. http://localhost:8070")
+    ap.add_argument("--llm", choices=["none", "anthropic", "ollama"], default="none",
+                    help="last-resort LLM tier for unidentifiable PDFs (default: none)")
+    ap.add_argument("--llm-model")
+    ap.add_argument("--ollama-url")
+    ap.add_argument("--workers", type=int, default=4)
+    ap.add_argument("--cache-dir", type=Path,
+                    help="HTTP and link-check cache (default: env PDFBATCH_CACHE_DIR, else the per-user "
+                         r"cache folder: %%LOCALAPPDATA%%\pdfbatch\Cache, ~/Library/Caches/pdfbatch "
+                         "or ~/.cache/pdfbatch)")
+
+
+def check_lookup_options(ap: argparse.ArgumentParser, args: argparse.Namespace) -> None:
+    args.cache_dir = args.cache_dir or apis.default_cache_dir()
+    if not args.mailto:
+        ap.error("--mailto (or CONTACT_MAILTO) is required by the CrossRef/OpenAlex polite pools")
+
+
+def make_llm(args: argparse.Namespace) -> LlmIdentifier | None:
+    """The LLM tier, or None. Raises ValueError (`--llm anthropic` without a key): call it
+    before any work, not once per PDF."""
+    return LlmIdentifier(args.llm, args.llm_model, args.ollama_url) if args.llm != "none" else None
+
+
+def make_lookup(args: argparse.Namespace, llm: LlmIdentifier | None, **settings) -> tuple[apis.Http, Settings]:
+    return (apis.Http(args.mailto, args.cache_dir / "http"),
+            Settings(openalex_api_key=args.openalex_key, grobid_url=args.grobid, llm=llm, **settings))
+
+
+# ---------------------------------------------------------------------------
+
 def _arguments(argv) -> argparse.Namespace:
     ap = argparse.ArgumentParser(prog="pdf-batch", description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -32,34 +72,20 @@ def _arguments(argv) -> argparse.Namespace:
     ap.add_argument("--out", type=Path, help="output dir (default: <input_dir>/_metadata)")
     ap.add_argument("--name", default="papers", help="base name of output files (default: papers)")
     ap.add_argument("--recursive", action="store_true", help="include PDFs in subdirectories")
-    ap.add_argument("--mailto", default=os.environ.get("CONTACT_MAILTO"),
-                    help="contact e-mail for CrossRef/OpenAlex polite pools (env CONTACT_MAILTO)")
+    add_lookup_options(ap)
     ap.add_argument("--unpaywall", action="store_true",
                     help="also query Unpaywall for OA status (uses --mailto; needs a real address)")
-    ap.add_argument("--openalex-key", default=os.environ.get("OPENALEX_API_KEY"))
-    ap.add_argument("--grobid", metavar="URL", help="GROBID server, e.g. http://localhost:8070")
-    ap.add_argument("--llm", choices=["none", "anthropic", "ollama"], default="none",
-                    help="last-resort LLM tier for unidentifiable PDFs (default: none)")
-    ap.add_argument("--llm-model")
-    ap.add_argument("--ollama-url")
     ap.add_argument("--check-links", action="store_true", help="HEAD-check code links")
     ap.add_argument("--preprint-ris-type", default="JOUR",
                     help="RIS TY for preprints: JOUR (default, imports cleanly everywhere) or UNPB")
     ap.add_argument("--attach", choices=["uri", "path", "none"], default="uri",
                     help="write L1 file attachment as file:// URI (default), plain path, or omit")
     ap.add_argument("--bom", action="store_true", help="write a UTF-8 BOM in the RIS file")
-    ap.add_argument("--workers", type=int, default=4)
     ap.add_argument("--force", action="store_true", help="re-process PDFs already in the JSON file")
     ap.add_argument("--retry-unresolved", action="store_true",
                     help="re-process PDFs left unresolved last time, e.g. after adding --grobid, --llm or Tesseract")
-    ap.add_argument("--cache-dir", type=Path,
-                    help="HTTP and link-check cache (default: env PDFBATCH_CACHE_DIR, else the per-user "
-                         r"cache folder: %%LOCALAPPDATA%%\pdfbatch\Cache, ~/Library/Caches/pdfbatch "
-                         "or ~/.cache/pdfbatch)")
     args = ap.parse_args(argv)
-    args.cache_dir = args.cache_dir or apis.default_cache_dir()
-    if not args.mailto:
-        ap.error("--mailto (or CONTACT_MAILTO) is required by the CrossRef/OpenAlex polite pools")
+    check_lookup_options(ap, args)
     return args
 
 
@@ -102,8 +128,8 @@ def main(argv=None) -> int:
         if '"' in str(src):                    # Windows reads `\"` as a literal quote
             log('Hint: remove the backslash before the closing quote ("...\\folder", not "...\\folder\\").')
         return 1
-    try:                                       # before any work, not once per PDF
-        llm = LlmIdentifier(args.llm, args.llm_model, args.ollama_url) if args.llm != "none" else None
+    try:
+        llm = make_llm(args)
     except ValueError as e:
         log(str(e))
         return 2
@@ -116,14 +142,11 @@ def main(argv=None) -> int:
         log(f"No PDFs found in {src}")
         return 1
 
-    settings = Settings(
+    http, settings = make_lookup(
+        args, llm,
         unpaywall_email=args.mailto if args.unpaywall else None,
-        openalex_api_key=args.openalex_key,
-        grobid_url=args.grobid,
-        llm=llm,
         link_checker=LinkChecker(args.cache_dir / "links") if args.check_links else None,
     )
-    http = apis.Http(args.mailto, args.cache_dir / "http")
 
     # Reruns are incremental: PDFs are keyed by content, so renamed files are recognised.
     json_path = out / f"{args.name}.json"
