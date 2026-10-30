@@ -25,3 +25,8 @@ dist/
 Thumbs.db
 .vscode/
 .idea/
+
+# Benchmark: your PDFs (copyrighted), gold set (personal) and results
+bench/gold.csv
+bench/pdfs/
+bench/results/

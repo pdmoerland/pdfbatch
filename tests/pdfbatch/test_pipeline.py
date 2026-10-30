@@ -537,3 +537,37 @@ def test_retry_unresolved(tmp_path, http, monkeypatch):
                         else real_route(url, params))           # e.g. GROBID or an LLM now finds it
     assert _run_cli(src, tmp_path) == 0 and confidence() == "unresolved"     # cached
     assert _run_cli(src, tmp_path, "--retry-unresolved") == 0 and confidence() == "high"
+
+
+# --------------------------------------------------------------------------- benchmark
+
+def test_benchmark_scoring():
+    from bench.run_benchmark import changes, score
+
+    def row(h, doi, status="verified"):
+        return {"sha256": h, "file": f"{h}.pdf", "doi": doi, "status": status, "comment": ""}
+
+    def rec(h, doi=None, confidence="high", via="doi:page1-header", **kw):
+        return Record(pdf_sha256=h, doi=doi, confidence=confidence, resolved_via=[via], **kw)
+
+    gold = [row("a", "10.1000/A"), row("b", "10.1000/b"), row("c", ""), row("d", "10.1000/d"), row("e", ""),
+            row("f", "10.1101/2024.01.01.1"), row("g", "10.1000/g", status="unverified"), row("h", "10.1000/h")]
+    records = [rec("a", "https://doi.org/10.1000/a"),                          # cleaned on both sides
+               rec("b", "10.1000/other", via="title-search"),
+               rec("c", "10.1000/c", via="title-search"),                      # a DOI where gold has none
+               rec("d", confidence="unresolved", via="pdf-only"),
+               rec("e", confidence="unresolved", via="pdf-only"),
+               Record(pdf_sha256="f", doi="10.1000/published", related_doi="10.1101/2024.01.01.1", confidence="high",
+                      resolved_via=["doi:page1-header", "crossref", "published-version"]),
+               rec("g", "10.1000/wrong")]                                     # unverified: not scored
+    s = score(gold, records)
+    assert s["n"] == 6 and s["absent"] == ["h.pdf"]
+    assert s["counts"] == {"correct": 2, "wrong": 2, "missed": 1, "correctly unresolved": 1}
+    assert s["precision"] == 0.5 and s["unresolved_rate"] == 2 / 6
+    assert s["by_route"] == {"doi:page1-header": {"correct": 2}, "title-search": {"wrong": 2}}
+    assert s["wrong"] == ["b.pdf", "c.pdf"]
+    # related_doi counts only when pdfbatch cites the published version instead of the PDF held.
+    held = Record(pdf_sha256="f", doi="10.1000/published", related_doi="10.1101/2024.01.01.1", confidence="high",
+                  resolved_via=["doi:page1-header", "crossref"])
+    after = score(gold, [r for r in records if r.pdf_sha256 != "f"] + [held])
+    assert changes(s, after) == [("f.pdf", "correct", "wrong")]
