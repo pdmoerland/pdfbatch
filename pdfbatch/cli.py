@@ -154,7 +154,7 @@ def main(argv=None) -> int:
     records, todo, hashes = [], [], {p: sha256_file(p) for p in pdfs}
     for p in pdfs:
         rec = known.get(hashes[p])
-        if rec and not (args.retry_unresolved and rec.confidence == "unresolved"):
+        if rec and not (args.retry_unresolved and rec.needs_review):
             rec = copy.deepcopy(rec)           # identical files share a hash, not a record
             rec.pdf_path = str(p)
             records.append(rec)

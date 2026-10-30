@@ -45,7 +45,7 @@ def outcome(gold_doi: str | None, rec: Record) -> str:
     """One PDF's outcome. A wrong DOI is the expensive mistake, so anything resolved
     that does not match the gold DOI counts as wrong, including a DOI where gold has none."""
     gold = _doi(gold_doi)
-    if rec.confidence == "unresolved":
+    if rec.needs_review:
         return "missed" if gold else "correctly unresolved"
     return "correct" if _doi(rec.doi) == gold else "wrong"
 
@@ -146,7 +146,7 @@ def init(args) -> int:
             w.writeheader()
         for r in sorted(records, key=lambda r: Path(r.pdf_path).name.casefold()):
             w.writerow({"sha256": r.pdf_sha256, "file": Path(r.pdf_path).name,
-                        "doi": (r.doi or "") if r.confidence != "unresolved" else "", "status": "unverified",
+                        "doi": "" if r.needs_review else (r.doi or ""), "status": "unverified",
                         "comment": f"pdfbatch: {r.confidence} via {' / '.join(r.resolved_via)}"})
     print(f"Check each new row, correct its doi, and set status to verified: {args.gold}", file=sys.stderr)
     return 0
