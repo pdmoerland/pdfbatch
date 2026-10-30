@@ -46,10 +46,11 @@ jobs:
       - name: pytest
         shell: bash
         run: |
-          uv run pytest -rfE --tb=short 2>&1 | tee pytest.log
-          status=${PIPESTATUS[0]}
+          # GitHub runs this with bash -eo pipefail: catch pytest's status rather than stop on it.
+          status=0
+          uv run pytest -rfE --tb=short 2>&1 | tee pytest.log || status=$?
           if [ "$status" != 0 ]; then
-            lines=$(grep -E '^(FAILED|ERROR)|^E  ' pytest.log | head -40)
+            lines=$(grep -E '^(FAILED|ERROR)|^E  ' pytest.log | head -40 || true)
             # No failed test reported (a crash, a collection or usage error): show how the output ended.
             [ -n "$lines" ] || lines=$(tail -n 30 pytest.log)
             echo                               # a crash can leave the last line open; ::error must start one
