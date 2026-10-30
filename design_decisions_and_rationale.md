@@ -147,10 +147,9 @@ A `closed` paper whose PDF you hold came through a subscription. The flag is the
 
 CrossRef's `is-preprint-of` / `has-preprint` relations and arXiv's `<arxiv:doi>` link the versions of a paper.
 
-- **Default (`--prefer held`):** the record describes the version you hold, with a note pointing to the other version.
-- **`--prefer published`:** the published record replaces the bibliographic fields. Journal-specific fields are cleared first, so no arXiv leftovers remain. The preprint becomes `related_doi`, and the OA data is reset so that enrichment fetches the published version's status.
+The record always describes the version you hold, with a note pointing to the other version ("Published version exists: …" or "Preprint version: …"). The other version's DOI is kept in `related_doi`; its metadata is never fetched or merged.
 
-**Why default to the held version.** The PDF is what you will annotate and cite from. Silently citing a different version would be surprising.
+**Why only the held version.** Every field should be traceable to the PDF in the folder: it is what you annotate and cite from, and a preprint can differ from its journal version in title, authors, figures and results. Iteration 9 still had `--prefer published`, which replaced the bibliographic fields with the journal record's; [iteration 10](docs/plans/2026-10-30-refactor-held-version-only-plan.md) removed it.
 
 ---
 
@@ -297,3 +296,4 @@ Principles applied in [iteration 4](docs/plans/2026-10-02-refactor-minimal-elega
 | 7 | [The right version, and only the paper's own links](docs/plans/2026-10-13-fix-versions-and-own-links-plan.md) | `92042ef`, `2671d54`, `60cfd1b` |
 | 8 | [Your own notes](docs/plans/2026-10-14-feat-user-notes-plan.md) | `b385031` |
 | 9 | [Robustness fixes and an accuracy benchmark](docs/plans/2026-10-30-fix-robustness-and-benchmark-plan.md) | `f240d2a` … `33fb1b3` |
+| 10 | [Only the version you hold](docs/plans/2026-10-30-refactor-held-version-only-plan.md) | see the plan |

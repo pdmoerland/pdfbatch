@@ -55,7 +55,7 @@ Code and data links are found in the PDF full text plus its link annotations, wh
 
 ## Preprints
 
-By default the record describes the version you hold, with the other version's DOI noted. `--prefer published` cites the published version instead when CrossRef or arXiv links one.
+The record always describes the version you hold: a preprint is cited as the preprint, even when it has since been published in a journal. When CrossRef or arXiv links the other version, its DOI is given in a note ("Published version exists: …").
 
 ## Your own notes
 

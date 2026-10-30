@@ -166,12 +166,13 @@ def test_arxiv_held_version(pdf_dir, http):
     assert any("btae100" in n for n in r.notes)
 
 
-def test_arxiv_prefer_published(pdf_dir, http):
-    r = process_pdf(pdf_dir / "2401.01234v2.pdf", http, settings(prefer="published"))
-    assert r.doi == "10.1093/bioinformatics/btae100"
-    assert r.journal == "Bioinformatics" and r.article_number == "btae100"
-    assert not r.is_preprint and r.oa.status == "gold"
-    assert r.related_doi == "10.48550/arxiv.2401.01234"
+def test_published_version_is_only_noted(pdf_dir, http):
+    # The record describes the PDF held, never the journal version it became.
+    r = process_pdf(pdf_dir / "2401.01234v2.pdf", http, settings())
+    assert r.doi == "10.48550/arxiv.2401.01234" and r.journal != "Bioinformatics"
+    assert r.article_number is None and r.oa.status == "green"
+    assert "Published version exists: https://doi.org/10.1093/bioinformatics/btae100" in r.notes
+    assert not any("btae100" in url for url in http.calls)
 
 
 def test_title_search_without_doi(pdf_dir, http):
@@ -552,13 +553,14 @@ def test_benchmark_scoring():
 
     gold = [row("a", "10.1000/A"), row("b", "10.1000/b"), row("c", ""), row("d", "10.1000/d"), row("e", ""),
             row("f", "10.1101/2024.01.01.1"), row("g", "10.1000/g", status="unverified"), row("h", "10.1000/h")]
+    preprint = Record(pdf_sha256="f", doi="10.1101/2024.01.01.1", related_doi="10.1000/published",
+                      related_relation="is-preprint-of", confidence="high", resolved_via=["doi:page1-header"])
     records = [rec("a", "https://doi.org/10.1000/a"),                          # cleaned on both sides
                rec("b", "10.1000/other", via="title-search"),
                rec("c", "10.1000/c", via="title-search"),                      # a DOI where gold has none
                rec("d", confidence="unresolved", via="pdf-only"),
                rec("e", confidence="unresolved", via="pdf-only"),
-               Record(pdf_sha256="f", doi="10.1000/published", related_doi="10.1101/2024.01.01.1", confidence="high",
-                      resolved_via=["doi:page1-header", "crossref", "published-version"]),
+               preprint,                                                  # the held version is the right one
                rec("g", "10.1000/wrong")]                                     # unverified: not scored
     s = score(gold, records)
     assert s["n"] == 6 and s["absent"] == ["h.pdf"]
@@ -566,8 +568,8 @@ def test_benchmark_scoring():
     assert s["precision"] == 0.5 and s["unresolved_rate"] == 2 / 6
     assert s["by_route"] == {"doi:page1-header": {"correct": 2}, "title-search": {"wrong": 2}}
     assert s["wrong"] == ["b.pdf", "c.pdf"]
-    # related_doi counts only when pdfbatch cites the published version instead of the PDF held.
-    held = Record(pdf_sha256="f", doi="10.1000/published", related_doi="10.1101/2024.01.01.1", confidence="high",
-                  resolved_via=["doi:page1-header", "crossref"])
-    after = score(gold, [r for r in records if r.pdf_sha256 != "f"] + [held])
+    # A record carrying the published version's DOI does not describe the preprint held.
+    published = Record(pdf_sha256="f", doi="10.1000/published", related_doi="10.1101/2024.01.01.1",
+                       confidence="high", resolved_via=["doi:page1-header"])
+    after = score(gold, [r for r in records if r.pdf_sha256 != "f"] + [published])
     assert changes(s, after) == [("f.pdf", "correct", "wrong")]

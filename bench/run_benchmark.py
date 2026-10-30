@@ -45,16 +45,11 @@ def _doi(value: Optional[str]) -> Optional[str]:
 
 def outcome(gold_doi: Optional[str], rec: Record) -> str:
     """One PDF's outcome. A wrong DOI is the expensive mistake, so anything resolved
-    that does not match the gold DOI counts as wrong, including a DOI where gold has none.
-    When pdfbatch cites the published version of a preprint, the held DOI it keeps in
-    `related_doi` matches too."""
+    that does not match the gold DOI counts as wrong, including a DOI where gold has none."""
     gold = _doi(gold_doi)
     if rec.confidence == "unresolved":
         return "missed" if gold else "correctly unresolved"
-    got = {_doi(rec.doi)}
-    if "published-version" in rec.resolved_via:
-        got.add(_doi(rec.related_doi))
-    return "correct" if gold in got else "wrong"
+    return "correct" if _doi(rec.doi) == gold else "wrong"
 
 
 def score(gold_rows: Iterable[dict], records: Iterable[Record]) -> dict:
@@ -104,8 +99,7 @@ def changes(old: dict, new: dict) -> List[tuple]:
 
 def _process(pdfs: Dict[str, Path], args) -> List[Record]:
     """process_pdf on each PDF, with the CLI's Settings and HTTP cache."""
-    settings = Settings(openalex_api_key=args.openalex_key, prefer=args.prefer, grobid_url=args.grobid,
-                        llm=args.llm_tier)
+    settings = Settings(openalex_api_key=args.openalex_key, grobid_url=args.grobid, llm=args.llm_tier)
     http = apis.Http(args.mailto, args.cache_dir / "http")
 
     def one(item):
@@ -195,7 +189,7 @@ def run(args) -> int:
 
     commit = _commit()
     result.update(commit=commit, date=datetime.now().isoformat(timespec="seconds"),
-                  options={"prefer": args.prefer, "grobid": bool(args.grobid), "llm": args.llm})
+                  options={"grobid": bool(args.grobid), "llm": args.llm})
     RESULTS.mkdir(exist_ok=True)
     stem = f"{datetime.now():%Y%m%d-%H%M%S}-{commit}"
     out = next(p for i in range(1, 100) if not (p := RESULTS / f"{stem}{f'-{i}' if i > 1 else ''}.json").exists())
@@ -225,7 +219,6 @@ def main(argv=None) -> int:
         p.add_argument("--gold", type=Path, required=True, help="gold CSV (see bench/gold.example.csv)")
         p.add_argument("--mailto", default=os.environ.get("CONTACT_MAILTO"))
         p.add_argument("--openalex-key", default=os.environ.get("OPENALEX_API_KEY"))
-        p.add_argument("--prefer", choices=["held", "published"], default="held")
         p.add_argument("--grobid", metavar="URL")
         p.add_argument("--llm", choices=["none", "anthropic", "ollama"], default="none")
         p.add_argument("--llm-model")

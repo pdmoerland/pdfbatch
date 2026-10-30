@@ -43,7 +43,6 @@ Hit = Tuple[Optional[dict], str, str]          # (API fields, confidence, how it
 class Settings:
     unpaywall_email: Optional[str] = None
     openalex_api_key: Optional[str] = None
-    prefer: str = "held"                       # 'held' | 'published'
     grobid_url: Optional[str] = None
     llm: Optional[LlmIdentifier] = None
     link_checker: Optional[LinkChecker] = None
@@ -234,29 +233,18 @@ def identify(http: apis.Http, s: Settings, pdf: PdfContent, rec: Record) -> None
 
 
 # ---------------------------------------------------------------------------
-# version policy and enrichment
+# other versions and enrichment
 # ---------------------------------------------------------------------------
 
-def apply_version_policy(http: apis.Http, s: Settings, rec: Record) -> None:
-    other = rec.related_doi
-    if not other:
+def note_other_version(rec: Record) -> None:
+    """Point to the paper's other version; never cite it. The record describes the PDF you
+    hold: a preprint stays a preprint even when its journal version is out."""
+    if not rec.related_doi:
         return
     if rec.related_relation == "has-preprint":
-        rec.notes.append(f"Preprint version: https://doi.org/{other}")
-        return
-    pub = apis.crossref_work(http, other) if s.prefer == "published" else None
-    if not pub:
-        rec.notes.append(f"Published version exists: https://doi.org/{other}")
-        return
-    held = rec.doi
-    for k in ("volume", "issue", "first_page", "last_page", "article_number", "issn", "journal_abbrev"):
-        setattr(rec, k, None)
-    _merge(rec, pub, override=True)
-    rec.is_preprint = False
-    rec.related_doi, rec.related_relation = held, "has-preprint"
-    rec.oa = OpenAccess()                      # the preprint's OA no longer applies; enrich() refetches
-    rec.resolved_via.append("published-version")
-    rec.notes.append(f"PDF is the preprint ({held}); citing the published version.")
+        rec.notes.append(f"Preprint version: https://doi.org/{rec.related_doi}")
+    else:
+        rec.notes.append(f"Published version exists: https://doi.org/{rec.related_doi}")
 
 
 def enrich(http: apis.Http, s: Settings, pdf: PdfContent, rec: Record) -> None:
@@ -312,7 +300,7 @@ def process_pdf(path: Path, http: apis.Http, s: Settings, sha256: Optional[str] 
     if pdf.ocr:
         rec.notes.append("No usable text layer: page 1 was read by OCR.")
     identify(http, s, pdf, rec)
-    apply_version_policy(http, s, rec)
+    note_other_version(rec)
     enrich(http, s, pdf, rec)
     rec.links = find_links(pdf, s.link_checker)
     return rec

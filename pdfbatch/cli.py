@@ -37,9 +37,6 @@ def _arguments(argv) -> argparse.Namespace:
     ap.add_argument("--unpaywall", action="store_true",
                     help="also query Unpaywall for OA status (uses --mailto; needs a real address)")
     ap.add_argument("--openalex-key", default=os.environ.get("OPENALEX_API_KEY"))
-    ap.add_argument("--prefer", choices=["held", "published"], default="held",
-                    help="for preprint PDFs with a published version: cite the version you hold "
-                         "(default) or the published one")
     ap.add_argument("--grobid", metavar="URL", help="GROBID server, e.g. http://localhost:8070")
     ap.add_argument("--llm", choices=["none", "anthropic", "ollama"], default="none",
                     help="last-resort LLM tier for unidentifiable PDFs (default: none)")
@@ -106,7 +103,6 @@ def main(argv=None) -> int:
     settings = Settings(
         unpaywall_email=args.mailto if args.unpaywall else None,
         openalex_api_key=args.openalex_key,
-        prefer=args.prefer,
         grobid_url=args.grobid,
         llm=llm,
         link_checker=LinkChecker(args.cache_dir / "links") if args.check_links else None,

@@ -6,7 +6,7 @@ Nothing personal is committed: `bench/pdfs/`, `bench/gold.csv` and `bench/result
 
 ## Build a gold set
 
-1. Put PDFs in `bench/pdfs/` (subfolders are fine). A useful set mixes the easy cases with the ones that go wrong: scans, theses, preprints with a published version, papers without a DOI, slides, reports.
+1. Put PDFs in `bench/pdfs/` (subfolders are fine). A useful set mixes the easy cases with the ones that go wrong: scans, theses, preprints that have since been published, papers without a DOI, slides, reports.
 2. Prefill the gold file from a normal pdfbatch run:
 
    ```bash
@@ -32,7 +32,7 @@ Nothing personal is committed: `bench/pdfs/`, `bench/gold.csv` and `bench/result
 uv run python bench/run_benchmark.py run --pdfs bench/pdfs --gold bench/gold.csv
 ```
 
-`--mailto`, `--openalex-key`, `--prefer`, `--grobid`, `--llm`, `--llm-model`, `--ollama-url`, `--workers` and `--cache-dir` mean what they mean for `pdf-batch`. Each run writes `bench/results/<timestamp>-<git short hash>.json` (`-dirty` when `pdfbatch/` has uncommitted changes) and prints:
+`--mailto`, `--openalex-key`, `--grobid`, `--llm`, `--llm-model`, `--ollama-url`, `--workers` and `--cache-dir` mean what they mean for `pdf-batch`. Each run writes `bench/results/<timestamp>-<git short hash>.json` (`-dirty` when `pdfbatch/` has uncommitted changes) and prints:
 
 - per outcome, its count and percentage:
 
@@ -47,7 +47,7 @@ uv run python bench/run_benchmark.py run --pdfs bench/pdfs --gold bench/gold.csv
 - correct and wrong per route, the first step of `resolved_via` (`doi:page1-header`, `title-search`, …);
 - the file name of every wrong result: those matter most, since a wrong record may never be noticed.
 
-DOIs are compared after the same cleaning pdfbatch applies. A paper resolved without a DOI (found by PMID, say) is correct when the gold `doi` is empty, and wrong when it is set. With `--prefer published`, a preprint whose published version is cited also counts as correct when the gold DOI is the preprint's.
+DOIs are compared after the same cleaning pdfbatch applies. A paper resolved without a DOI (found by PMID, say) is correct when the gold `doi` is empty, and wrong when it is set. For a preprint, the right DOI is the preprint's, even when a journal version exists: pdfbatch describes the PDF you hold.
 
 Options for comparing:
 

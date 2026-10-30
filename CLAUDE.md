@@ -30,6 +30,7 @@ uv run python bench/run_benchmark.py run --pdfs bench/pdfs --gold bench/gold.csv
 
 - Secrets and contact e-mail go in `.env` (gitignored), never in committed files.
 - The LLM never writes metadata; it only proposes a title/DOI that goes back through API lookup + validation.
+- Records describe the PDF in the folder. Another version (e.g. the journal article a preprint became) is only noted, never merged in.
 
 ## Design history
 
