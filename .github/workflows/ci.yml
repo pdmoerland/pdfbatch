@@ -24,9 +24,9 @@ jobs:
         os: [ubuntu-latest, macos-latest, windows-latest]
         python: ["3.11", "3.13"]               # the minimum in requires-python, and the newest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
-      - uses: astral-sh/setup-uv@v6
+      - uses: astral-sh/setup-uv@v7
         with:
           python-version: ${{ matrix.python }}
           enable-cache: true
@@ -42,5 +42,13 @@ jobs:
 
       # Offline: the tests use synthetic PDFs and mocked APIs, so no secrets are needed.
       # Tesseract is not installed; the OCR tests fake it.
+      # Failures also become an annotation: job logs need a GitHub login, annotations do not.
       - name: pytest
-        run: uv run pytest
+        shell: bash
+        run: |
+          uv run pytest -rfE --tb=short 2>&1 | tee pytest.log
+          status=${PIPESTATUS[0]}
+          if [ "$status" != 0 ]; then
+            echo "::error title=pytest failed::$(grep -E '^(FAILED|ERROR)|^E  ' pytest.log | head -40 | awk '{printf "%s%%0A", $0}')"
+          fi
+          exit "$status"
