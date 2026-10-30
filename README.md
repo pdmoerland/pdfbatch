@@ -26,7 +26,7 @@ uv run pdf-batch ~/papers --mailto you@uni.nl --unpaywall
 | 4 | GROBID header parse (`--grobid http://localhost:8070`) | 0 |
 | 5 | LLM search key from page 1 (`--llm anthropic` or `--llm ollama`), max ~1.5k tokens in | rare |
 
-Every hit is **validated**: the API title is fuzzy-matched against the PDF text, and the authors' surnames are checked for. A record is used only when the PDF confirms both its title and its authors (all of them, for a title-search hit). This stops a cited paper's DOI, or another work with the same title, from being accepted. The result is `high`, `medium` or `unresolved`; unresolved PDFs land in the Markdown "Needs review" section and get the tag `pdfbatch: needs review` in RIS. pdfbatch prefers leaving a PDF unresolved to importing a wrong record.
+Every hit is **validated**: the API title is fuzzy-matched against the PDF text, and the authors' surnames are checked for. A record is used only when the PDF confirms both its title and its authors (all of them, for a title-search hit, whose title must also match closely: a near miss is more often another version of the work, so it is only noted). This stops a cited paper's DOI, or another work with the same title, from being accepted. The result is `high`, `medium` or `unresolved`; unresolved PDFs land in the Markdown "Needs review" section and get the tag `pdfbatch: needs review` in RIS. pdfbatch prefers leaving a PDF unresolved to importing a wrong record.
 
 The LLM never writes metadata. It only produces a title or DOI, which goes back through tier 3 and validation.
 
@@ -55,7 +55,7 @@ Code and data links are found in the PDF full text plus its link annotations, wh
 
 ## Preprints
 
-The record always describes the version you hold: a preprint is cited as the preprint, even when it has since been published in a journal. When CrossRef or arXiv links the other version, its DOI is given in a note ("Published version exists: …").
+The record always describes the version you hold: a preprint is cited as the preprint, even when it has since been published in a journal. When CrossRef or arXiv links the other version, its DOI is given in a note ("Published version exists: …"). So is a DOI the PDF itself names as another version ("A previous version of this article appeared as …"), and a search hit whose title only nearly matches ("Possibly another version of this PDF: …").
 
 ## Your own notes
 

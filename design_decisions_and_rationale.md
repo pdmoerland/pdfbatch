@@ -64,7 +64,7 @@ Each tier runs only when the previous one produced nothing that validates ([`ide
 | Page 2 | 0.5 |
 | End of the last page | 0.3, and only if that page has no References heading |
 
-Text after a References heading is never searched, and a DOI seen in several places gets a small bonus. DOIs of data repositories (Zenodo, figshare, Dryad, OSF, Synapse) are never taken as the article's own.
+Text after a References heading is never searched, and a DOI seen in several places gets a small bonus. A DOI later in a sentence that starts with an other-version cue ("previous version", "earlier version", "Early Online Release", "originally published", "previously appeared") is not a candidate at all: PLoS prints "A previous version of this article appeared as an Early Online Release (DOI: ….eor)" in the page-1 footer, where it outranked the article's own DOI. It is noted instead. "Preprint" is deliberately no cue: bioRxiv stamps the PDF's own DOI as "bioRxiv preprint doi: …". DOIs of data repositories (Zenodo, figshare, Dryad, OSF, Synapse) are never taken as the article's own.
 
 **The title guess** joins the lines set in the largest font in the top 60% of page 1, keeping the first vertically contiguous run. The result must be 15–350 characters and must not look like a journal banner or "Research article". It is cheap and good enough for journal PDFs; GROBID and the LLM catch the rest.
 
@@ -84,13 +84,14 @@ Every API hit is checked against the PDF text before it is accepted (`validate`)
 | Confidence | Rule |
 |---|---|
 | `high` | title ≥ 90 **and** the authors found |
-| `medium` | title ≥ 75 **and** the authors found |
+| `medium` | title ≥ 75 **and** the authors found; for an identifier found in the PDF only, not a title-search hit |
 | `unresolved` | nothing confirmed; PDF-derived title and Info-dict authors only |
 
-**Specificity over sensitivity.** A title alone never confirms a match: a record is applied only when the PDF shows its title *and* its authors. An API hit that falls short is not used at all, not even as a flagged guess. A PDF left unresolved costs a minute by hand; a wrong record imported into your library may never be noticed.
+**Specificity over sensitivity.** A title alone never confirms a match: a record is applied only when the PDF shows its title *and* its authors. An API hit that falls short is not used at all, not even as a flagged guess; a near-miss search hit is at most named in a note, with nothing of it merged. A PDF left unresolved costs a minute by hand; a wrong record imported into your library may never be noticed.
 
 **How the result is used:**
-- **Accepted:** `high` and `medium`.
+- **Accepted:** `high`, and `medium` for a DOI or arXiv ID found in the PDF (or proposed by GROBID or the LLM). There `medium` mostly means hard-to-read text, and the identifier is evidence in itself.
+- **Title-search hits need `high`:** with no identifier to back it, a title that only nearly matches is more often another version of the work than this PDF: a 2004 technical report, "Are the NCI/FDA Ovarian Proteomic Data Biased? A Reply to …", matched its retitled journal version at `medium`. The best such near miss leaves the PDF unresolved with a note, "Possibly another version of this PDF: …", and nothing of it is merged.
 - **Review flag:** `unresolved` records are listed under "Needs review" in Markdown and tagged `pdfbatch: needs review` in RIS, so you can filter them in your reference manager.
 - **Title-search guard:** search hits must also resemble the query (`token_set_ratio` ≥ 85) and must not be a mere fragment of it: the hit's title needs at least 60% of the query's length. Otherwise an encyclopedia entry named after a method in the title ("Surface-Enhanced Laser Desorption/Ionization…") shares the words without being the paper. A *longer* hit is fine, because OCR'd queries can be fragments themselves.
 - **"The authors":** for a DOI or arXiv ID found in the PDF, at least one of the first five authors, because the identifier is evidence in itself. For a title-search hit, *every* author: a generic title ("Model Assessment and Selection") belongs to many works, such as a slide deck and a textbook chapter. A record without authors can never pass.
@@ -147,7 +148,7 @@ A `closed` paper whose PDF you hold came through a subscription. The flag is the
 
 CrossRef's `is-preprint-of` / `has-preprint` relations and arXiv's `<arxiv:doi>` link the versions of a paper.
 
-The record always describes the version you hold, with a note pointing to the other version ("Published version exists: …" or "Preprint version: …"). The other version's DOI is kept in `related_doi`; its metadata is never fetched or merged.
+The record always describes the version you hold, with a note pointing to the other version ("Published version exists: …" or "Preprint version: …"). The PDF can name another version itself, and a title search can land on one; both are noted too ("Other version named in the PDF: …", "Possibly another version of this PDF: …"), never cited. The other version's DOI is kept in `related_doi`; its metadata is never fetched or merged.
 
 **Why only the held version.** Every field should be traceable to the PDF in the folder: it is what you annotate and cite from, and a preprint can differ from its journal version in title, authors, figures and results. Iteration 9 still had `--prefer published`, which replaced the bibliographic fields with the journal record's; [iteration 10](docs/plans/2026-10-30-refactor-held-version-only-plan.md) removed it.
 
@@ -300,3 +301,4 @@ Principles applied in [iteration 4](docs/plans/2026-10-02-refactor-minimal-elega
 | 9 | [Robustness fixes and an accuracy benchmark](docs/plans/2026-10-30-fix-robustness-and-benchmark-plan.md) | `f240d2a` … `33fb1b3` |
 | 10 | [Only the version you hold](docs/plans/2026-10-30-refactor-held-version-only-plan.md) | `3958a87` |
 | 11 | [Code review fixes](docs/plans/2026-10-30-fix-review-findings-plan.md) | `29a46bc` … `73b4eb2` |
+| 12 | [Other versions are noted, not cited](docs/plans/2026-10-30-fix-other-versions-plan.md) | `0084117`, `6fe826a` |
