@@ -750,6 +750,18 @@ def test_api_key_not_in_cache_key(tmp_path, monkeypatch):
     h.cache.close()
 
 
+def test_404_expires_after_a_day(tmp_path, monkeypatch):
+    # A DOI unknown today (registered after its manuscript printed it) may resolve next week.
+    h = apis.Http("t@example.org", cache_dir=tmp_path)
+    monkeypatch.setattr(h.session, "get", lambda url, params=None, **k: _Response(404 if "new" in url else 200, {}))
+    assert h.get("https://api.example.org/works/new") is None
+    h.get("https://api.example.org/works/old")
+    lifetime = {url: h.cache.get(key, expire_time=True)[1] - time.time() for url, key in
+                (("new", "https://api.example.org/works/new?"), ("old", "https://api.example.org/works/old?"))}
+    h.cache.close()
+    assert 0 < lifetime["new"] <= 86400 < lifetime["old"]
+
+
 def test_default_cache_dir(tmp_path, monkeypatch):
     monkeypatch.setenv("PDFBATCH_CACHE_DIR", str(tmp_path / "mine"))
     assert apis.default_cache_dir() == tmp_path / "mine"

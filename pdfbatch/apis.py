@@ -28,6 +28,7 @@ from .record import Author, OpenAccess
 
 _RETRY = {429, 500, 502, 503, 504}
 CACHE_TTL = 30 * 86400                  # seconds: API responses and link checks
+NOT_FOUND_TTL = 86400                   # a DOI unknown today may be registered tomorrow
 MAX_RETRY_AFTER = 60.0                 # seconds; a server's "Retry-After: 3600" must not stall a worker
 _UNCACHED_PARAMS = {"api_key"}          # sent, but never written to the cache file
 
@@ -99,7 +100,7 @@ class Http:
                 continue
             if r.status_code == 404:
                 if self.cache is not None:
-                    self.cache.set(key, "__404__", expire=CACHE_TTL)
+                    self.cache.set(key, "__404__", expire=NOT_FOUND_TTL)
                 return None
             if r.status_code in _RETRY and attempt < retries:
                 time.sleep(_retry_after(r.headers.get("Retry-After"), delay))
