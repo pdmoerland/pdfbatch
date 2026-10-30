@@ -658,3 +658,32 @@ def test_apa_escapes_markdown():
     assert r"O\*Brien, P." in line and r"The \*lac\* operon\_1." in line
     assert r"*J\_Mol \[Biol\]*." in line
     assert len(re.findall(r"(?<!\\)\*", line)) == 2             # one pair of italics, around the journal
+
+
+def test_ollama_reply_is_parsed(monkeypatch):
+    posted = []
+
+    class Reply:
+        def raise_for_status(self):
+            pass
+
+        def json(self):
+            content = ('<think>x</think>```json\n{"title": "A Paper", "first_author_surname": "Doe", '
+                       '"year": null, "doi": null}\n```')
+            return {"message": {"content": content}, "prompt_eval_count": 100, "eval_count": 20}
+
+    monkeypatch.setattr(llm.requests, "post", lambda url, json=None, **k: posted.append(json) or Reply())
+    ident = llm.LlmIdentifier("ollama")
+    assert ident.identify("page text")["title"] == "A Paper"
+    assert (ident.tokens_in, ident.tokens_out, ident.calls, ident.failures) == (100, 20, 1, 0)
+    assert posted[0]["format"] == llm.SCHEMA and posted[0]["think"] is False
+
+
+def test_ollama_unreachable_counts_a_failure(monkeypatch):
+    def refuse(*a, **k):
+        raise llm.requests.ConnectionError("connection refused")
+
+    monkeypatch.setattr(llm.requests, "post", refuse)
+    ident = llm.LlmIdentifier("ollama")
+    assert ident.identify("page text") is None
+    assert (ident.calls, ident.failures) == (1, 1)
