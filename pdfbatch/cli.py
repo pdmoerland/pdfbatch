@@ -8,6 +8,7 @@ See README.md for every option.
 from __future__ import annotations
 
 import argparse
+import copy
 import os
 import sys
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -59,6 +60,22 @@ def _arguments(argv) -> argparse.Namespace:
     return args
 
 
+_SAME_CONTENT = "Same content as "
+
+
+def _mark_duplicates(records) -> None:
+    """Note on each identical copy which file it duplicates.
+
+    Copies stay separate entries: they are distinct files you hold, with their own
+    paths and notes. The note is recomputed every run, so it follows renames.
+    """
+    first = {}
+    for r in sorted(records, key=lambda r: r.pdf_path):
+        r.notes = [n for n in r.notes if not n.startswith(_SAME_CONTENT)]
+        if r.pdf_sha256 and (orig := first.setdefault(r.pdf_sha256, r)) is not r:
+            r.notes.append(f"{_SAME_CONTENT}{Path(orig.pdf_path).name}.")
+
+
 def main(argv=None) -> int:
     load_dotenv(find_dotenv(usecwd=True))      # nearest .env from the cwd up
     args = _arguments(argv)
@@ -96,6 +113,7 @@ def main(argv=None) -> int:
     records, todo = [], []
     for p in pdfs:
         if rec := known.get(sha256_file(p)):
+            rec = copy.deepcopy(rec)           # identical files share a hash, not a record
             rec.pdf_path = str(p)
             records.append(rec)
         else:
@@ -115,6 +133,8 @@ def main(argv=None) -> int:
             records.append(rec)
             log(f"[{i}/{len(todo)}] {rec.confidence:<10} {rec.oa.status or '?':<8} "
                 f"{rec.doi or '-':<35} {futures[f].name}")
+
+    _mark_duplicates(records)
 
     usage = ""
     if llm and llm.calls:

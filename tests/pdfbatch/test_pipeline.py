@@ -13,7 +13,7 @@ from pdfbatch.links import classify, find_links
 from pdfbatch.pdf_reader import PdfContent, read_pdf, unreadable
 from pdfbatch.pipeline import Settings, _name_in, _resembles, process_pdf, validate
 from pdfbatch.record import Author, Record
-from pdfbatch.writers import apa, read_notes, ris_entry, write_markdown
+from pdfbatch.writers import apa, read_json, read_notes, ris_entry, write_markdown
 
 from . import fixtures
 
@@ -459,3 +459,20 @@ def test_throttle_spaces_concurrent_requests(monkeypatch):
     stamps.sort()
     assert len(stamps) == 8
     assert min(b - a for a, b in zip(stamps, stamps[1:])) >= 0.045
+
+
+def _run_cli(src, tmp_path, *extra):
+    return cli.main([str(src), "--out", str(tmp_path / "out"), "--mailto", "t@example.org",
+                     "--cache-dir", str(tmp_path / "cache"), *extra])
+
+
+def test_duplicate_pdfs_keep_their_paths(pdf_dir, http, tmp_path):
+    src = tmp_path / "src"; src.mkdir()
+    for name in ("a_copy.pdf", "b_copy.pdf"):
+        (src / name).write_bytes((pdf_dir / "scan_0042.pdf").read_bytes())
+    assert _run_cli(src, tmp_path) == 0
+    assert _run_cli(src, tmp_path) == 0                       # incremental: both come from the JSON
+    recs = sorted(read_json(tmp_path / "out" / "papers.json"), key=lambda r: r.pdf_path)
+    assert [Path(r.pdf_path).name for r in recs] == ["a_copy.pdf", "b_copy.pdf"]
+    assert "Same content as a_copy.pdf." not in recs[0].notes
+    assert recs[1].notes.count("Same content as a_copy.pdf.") == 1
