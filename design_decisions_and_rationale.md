@@ -277,12 +277,12 @@ cli ──► pipeline.process_pdf ──► pdf_reader.read_pdf
     ──► writers (json, ris, md)
 ```
 
-Principles applied in [iteration 4](docs/plans/2026-10-02-refactor-minimal-elegant-code-plan.md):
+Principles applied in [iteration 4](docs/plans/2026-10-02-refactor-minimal-elegant-code-plan.md) and [iteration 14](docs/plans/2026-10-30-refactor-one-definition-per-idea-plan.md):
 
-- **One definition per idea:** "needs review", the OA rule, URL canonicalisation and the DOI-then-title lookup each exist once.
+- **One definition per idea:** "needs review", the preprint-server OA rule (`OpenAccess.preprint_server`), URL canonicalisation, the DOI-then-title lookup and the 30-day cache lifetime (`apis.CACHE_TTL`) each exist once. The benchmark imports the CLI's lookup options and builds `Http` and `Settings` through the same functions (`add_lookup_options`, `make_llm`, `make_lookup` in [`cli.py`](pdfbatch/cli.py)), so it scores pdfbatch exactly as `pdf-batch` runs it.
 - **No knobs nobody turns:** settings live in `Settings` only if the CLI can set them; fixed policy lives in module constants (`MAX_PER_KIND`, `BLOCKLIST`).
 - **No code for impossible cases:** required dependencies are imported directly, without `try: import` guards.
-- **Refactors must not change output:** Markdown and RIS for the test fixtures are compared byte-for-byte before and after.
+- **Refactors must not change output:** Markdown and RIS for the test fixtures are compared byte-for-byte before and after; iteration 14 also compared the full output for 92 real PDFs.
 
 ---
 
@@ -303,3 +303,4 @@ Principles applied in [iteration 4](docs/plans/2026-10-02-refactor-minimal-elega
 | 11 | [Code review fixes](docs/plans/2026-10-30-fix-review-findings-plan.md) | `29a46bc` … `73b4eb2` |
 | 12 | [Other versions are noted, not cited](docs/plans/2026-10-30-fix-other-versions-plan.md) | `0084117`, `6fe826a` |
 | 13 | [Double-spaced titles](docs/plans/2026-10-30-fix-double-spaced-titles-plan.md) | `680f9c6` |
+| 14 | [One definition per idea](docs/plans/2026-10-30-refactor-one-definition-per-idea-plan.md) | `c79f7b6` … `7ae9ca7` |
