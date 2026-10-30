@@ -47,7 +47,7 @@ uv run python bench/run_benchmark.py run --pdfs bench/pdfs --gold bench/gold.csv
 - correct and wrong per route, the first step of `resolved_via` (`doi:page1-header`, `title-search`, …);
 - the file name of every wrong result: those matter most, since a wrong record may never be noticed.
 
-DOIs are compared after the same cleaning pdfbatch applies. With `--prefer published`, a preprint whose published version is cited also counts as correct when the gold DOI is the preprint's.
+DOIs are compared after the same cleaning pdfbatch applies. A paper resolved without a DOI (found by PMID, say) is correct when the gold `doi` is empty, and wrong when it is set. With `--prefer published`, a preprint whose published version is cited also counts as correct when the gold DOI is the preprint's.
 
 Options for comparing:
 

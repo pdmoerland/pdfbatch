@@ -14,6 +14,7 @@ CLI that turns a folder of PDFs into `<name>.md` + `<name>.ris` (EndNote/Zotero)
 | `pdfbatch/llm.py` | Optional last-resort LLM (Anthropic / Ollama) that only produces a search key. |
 | `pdfbatch/links.py` | Code/data platforms + blocklist, heuristic labels, cached HEAD-check, `find_links`. |
 | `pdfbatch/record.py`, `writers.py` | Data model; APA, Markdown, RIS and JSON writers. |
+| `bench/` | Accuracy benchmark against a hand-checked gold set (real APIs, not pytest); `score()` is unit-tested. See `bench/README.md`. |
 
 ## Running
 
@@ -21,6 +22,8 @@ CLI that turns a folder of PDFs into `<name>.md` + `<name>.ris` (EndNote/Zotero)
 uv sync --extra dev               # works in any shell; Windows PowerShell 5.1 has no &&
 uv run pdf-batch ~/papers --unpaywall
 uv run pytest                     # offline: synthetic PDFs + mocked APIs
+uv run ruff check pdfbatch tests bench
+uv run python bench/run_benchmark.py run --pdfs bench/pdfs --gold bench/gold.csv   # real APIs
 ```
 
 ## Conventions

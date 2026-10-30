@@ -96,6 +96,7 @@ Every run puts each note under the paper's citation in `papers.md`, and in `pape
 | `--openalex-key` (env `OPENALEX_API_KEY`) | Use your own OpenAlex API key |
 | `--llm-model`, `--ollama-url` (env `OLLAMA_URL`) | Model and server for the `--llm` tier (defaults: `claude-haiku-4-5`, `qwen3:8b` at `http://localhost:11434`) |
 | `--workers 4` | Number of PDFs processed in parallel. APIs are throttled per host |
+| `--retry-unresolved` | Re-process only the PDFs left unresolved last time, e.g. after adding `--grobid`, `--llm` or Tesseract (`--force` redoes everything) |
 | `--cache-dir DIR` | Where API responses and link checks are cached for 30 days (default: `.pdfbatch_cache/` in the current folder) |
 
 Run `pdf-batch --help` for the full list.
@@ -121,6 +122,10 @@ The tests generate synthetic PDFs and mock the APIs with real response shapes, s
 - an unresolvable PDF
 - references-section link exclusion
 - RIS/Markdown structure
+
+## Measuring accuracy
+
+`bench/run_benchmark.py` scores pdfbatch against a hand-checked list of the right DOI for each of your PDFs: how many come out correct, wrong, missed or correctly unresolved, with precision, results per identification route, and every wrong file named. It runs against the real APIs and keeps your PDFs and gold set out of git. Use it before and after changing how papers are matched; see [bench/README.md](bench/README.md).
 
 ## Design and history
 

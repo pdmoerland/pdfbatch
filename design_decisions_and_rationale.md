@@ -100,6 +100,8 @@ Every API hit is checked against the PDF text before it is accepted (`validate`)
 
 **Why.** Without validation, the first DOI on page 1 is often a reference ("Earlier atlases (doi:…) lacked …"). One cheap fuzzy match catches this.
 
+**Thresholds are measured, not tuned by feel.** [`bench/`](bench/README.md) scores pdfbatch against a hand-checked gold set of the right DOI per PDF: correct, wrong, missed, correctly unresolved, with precision and the wrong files listed. A threshold (90, 75, 85, the 60% length guard, the edit distances for names) should change only with a benchmark run before and after the change, and the change is worth keeping only if wrong results do not go up.
+
 ---
 
 ## The LLM only proposes a search key
@@ -234,6 +236,9 @@ Records are keyed by the PDF's SHA-256 ([`cli.py`](pdfbatch/cli.py)).
 - **Reruns:** only new files are processed. A renamed or moved file is recognised and its `pdf_path` updated.
 - **`--force`:** redoes everything.
 - **Failures:** a PDF that cannot be opened, or a worker that crashes, gets a record with a note, and the batch continues. Those records carry no hash, so they are retried on the next run.
+- **`--retry-unresolved`:** re-processes only the PDFs left unresolved. Unresolved records are cached like resolved ones, so without it the only way to give them another chance after adding `--grobid`, `--llm` or Tesseract was `--force`, which redoes every PDF.
+
+**Identical files stay separate entries.** Two PDFs with the same content share a hash, but they are distinct files you hold, each with its own path and perhaps its own note in `notes.md`. A rerun reuses a *copy* of the cached record per file; sharing one record let the last path win and orphaned the other file's note. Every copy after the first (by path) is noted "Same content as <file>.", so duplicates are easy to spot and clean up.
 
 ---
 
@@ -242,7 +247,7 @@ Records are keyed by the PDF's SHA-256 ([`cli.py`](pdfbatch/cli.py)).
 All HTTP goes through one shared `Http` instance ([`apis.py`](pdfbatch/apis.py)):
 
 - **User-Agent** with `mailto:`. This gets CrossRef and OpenAlex "polite pool" treatment, which is why `--mailto` / `CONTACT_MAILTO` is required.
-- **Throttling** per host: 0.12 s between requests in general, and 3 s for arXiv, as its API terms ask.
+- **Throttling** per host: 0.12 s between requests in general, and 3 s for arXiv, as its API terms ask. Each worker thread reserves its own slot under a lock and sleeps outside it, so two threads never hit a host at once and a wait for one host does not hold up the others.
 - **Retries** on 429/5xx with exponential backoff, honouring `Retry-After`.
 - **A 30-day disk cache** in `.pdfbatch_cache/`. 404s are cached too, so reruns and repeated lookups are nearly free.
 
@@ -260,7 +265,7 @@ Five runtime dependencies: `requests`, `diskcache`, `python-dotenv`, `pymupdf` a
 
 ## Code shape
 
-The package has ten modules, about 1,900 lines, and one data flow:
+The package has ten modules, about 2,000 lines, and one data flow:
 
 ```
 cli ──► pipeline.process_pdf ──► pdf_reader.read_pdf
@@ -291,3 +296,4 @@ Principles applied in [iteration 4](docs/plans/2026-10-02-refactor-minimal-elega
 | 6 | [Specificity over sensitivity](docs/plans/2026-10-02-refactor-specificity-plan.md) | `4e42d8a` |
 | 7 | [The right version, and only the paper's own links](docs/plans/2026-10-13-fix-versions-and-own-links-plan.md) | `92042ef`, `2671d54`, `60cfd1b` |
 | 8 | [Your own notes](docs/plans/2026-10-14-feat-user-notes-plan.md) | `b385031` |
+| 9 | [Robustness fixes and an accuracy benchmark](docs/plans/2026-10-30-fix-robustness-and-benchmark-plan.md) | `f240d2a` … `33fb1b3` |
