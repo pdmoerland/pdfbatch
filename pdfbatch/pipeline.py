@@ -133,22 +133,30 @@ def _resembles(query: str, title: str | None) -> bool:
 
 def _title_search(http: apis.Http, s: Settings, pdf: PdfContent, title: str,
                   surname: str | None = None) -> tuple[dict | None, Verdict]:
-    """CrossRef, then OpenAlex: the best hit that resembles `title` and validates.
+    """CrossRef, then OpenAlex: the best hit that resembles `title` and validates `high`.
 
     OpenAlex is asked whenever CrossRef has nothing *usable*, not only nothing at all:
     CrossRef's top rows can all be records *about* the paper ("Faculty Opinions
     recommendation of <title>") that rightly fail validation.
+
+    A search hit has no identifier in the PDF to back it, so a title that only nearly
+    matches (`medium`) is more often another version of the work (a technical report
+    retitled as a journal article) than this PDF. The best such hit comes back as a
+    near miss, `(hit, "low")`, to be noted and never merged.
     """
     searches = (("crossref-search", lambda: apis.crossref_search(http, title, surname)),
                 ("openalex-search", lambda: apis.openalex_search(http, title, s.openalex_api_key)))
+    near = None
     for via, search in searches:
         scored = [(validate(h, pdf, all_authors=True), h) for h in search() if _resembles(title, h.get("title"))]
         if scored:
             (conf, _), h = max(scored, key=lambda x: (_RANK[x[0][0]], x[0][1]))
-            if _good(conf):
-                h["_via"] = via
+            h["_via"] = via
+            if conf == "high":
                 return h, conf
-    return None, "low"
+            if conf == "medium":
+                near = near or h
+    return near, "low"
 
 
 def _lookup(http: apis.Http, s: Settings, pdf: PdfContent, doi: str | None, title: str | None,
@@ -221,7 +229,14 @@ def _apply(rec: Record, f: dict, conf: str, how: str) -> None:
 
 
 def identify(http: apis.Http, s: Settings, pdf: PdfContent, rec: Record) -> None:
-    hit = _best_candidate(http, s, pdf) or next((h for h in _fallbacks(http, s, pdf) if _good(h[1])), None)
+    hit, near = _best_candidate(http, s, pdf), {}
+    if not hit:
+        for h in _fallbacks(http, s, pdf):
+            if _good(h[1]):
+                hit = h
+                break
+            if h[0]:                           # a near miss from a title search
+                near.setdefault(h[0].get("doi") or h[0].get("url") or h[0].get("title"), h[0])
     if hit:
         _apply(rec, *hit)
         return
@@ -233,6 +248,10 @@ def identify(http: apis.Http, s: Settings, pdf: PdfContent, rec: Record) -> None
         rec.authors = [Author.from_display(a) for a in
                        re.split(r";|\band\b|,(?=\s*[A-Z][a-z]+\s+[A-Z])", pdf.info["author"]) if a.strip()]
     rec.notes.append("No record could be confirmed by title and authors; only PDF-derived fields are present.")
+    for f in near.values():
+        link = f"https://doi.org/{f['doi']}" if f.get("doi") else f.get("url")
+        rec.notes.append(f'Possibly another version of this PDF: "{f.get("title")}"'
+                         + (f" ({link})" if link else "") + "; its title differs.")
     if pdf.is_probably_scanned:
         rec.notes.append("PDF has no usable text layer — install Tesseract for automatic OCR "
                          "of page 1, or run ocrmypdf on the file, and rerun with --retry-unresolved.")

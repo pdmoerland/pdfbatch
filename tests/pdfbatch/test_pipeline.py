@@ -154,6 +154,32 @@ def test_doi_of_another_version_is_not_a_candidate():
     assert other_version_dois(pdf) == []
 
 
+def test_search_hit_with_a_near_miss_title_is_only_noted(tmp_path, http, monkeypatch):
+    # A technical report whose journal version was retitled: same authors, same subtitle.
+    doc = pymupdf.open()
+    fixtures._page(doc, [(50, 100, "Are the NCI/FDA Ovarian Proteomic Data", 18),
+                         (50, 124, "Biased? A Reply to Producers and Consumers", 18),
+                         (50, 160, "Keith A. Baggerly, Kevin R. Coombes, and Jeffrey S. Morris", 11),
+                         (50, 180, "Department of Biostatistics, U.T. M.D. Anderson Cancer Center", 9)])
+    doc.save(tmp_path / "baggerly_prodcon.pdf")
+    doc.close()
+    hit = {"message": {"items": [{"DOI": "10.1177/117693510500100101", "type": "journal-article",
+                                  "title": ["Bias, Randomization, and Ovarian Proteomic Data: "
+                                            "A Reply to Producers and Consumers"],
+                                  "author": [{"given": "Keith A.", "family": "Baggerly"},
+                                             {"given": "Kevin R.", "family": "Coombes"},
+                                             {"given": "Jeffrey S.", "family": "Morris"}]}]}}
+    real_route = fixtures.route
+    monkeypatch.setattr(fixtures, "route", lambda url, params: hit if url.endswith("api.crossref.org/works")
+                        else real_route(url, params))
+    r = process_pdf(tmp_path / "baggerly_prodcon.pdf", http, settings())
+    assert r.confidence == "unresolved" and r.doi is None
+    assert r.title.startswith("Are the NCI/FDA")
+    assert ('Possibly another version of this PDF: "Bias, Randomization, and Ovarian Proteomic Data: '
+            'A Reply to Producers and Consumers" (https://doi.org/10.1177/117693510500100101); '
+            "its title differs.") in r.notes
+
+
 def test_title_guess(pdf_dir):
     p = read_pdf(pdf_dir / "scan_0042.pdf")
     assert p.title_guess == "Phase separation of transcription factors in plant immunity"
