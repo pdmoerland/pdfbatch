@@ -1,0 +1,46 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:                                   # a newer push supersedes a running check
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: ${{ matrix.os }} / Python ${{ matrix.python }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false                         # one system's failure must not hide the others'
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+        python: ["3.11", "3.13"]               # the minimum in requires-python, and the newest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: astral-sh/setup-uv@v6
+        with:
+          python-version: ${{ matrix.python }}
+          enable-cache: true
+
+      - name: Install (fails if uv.lock is out of date)
+        run: uv sync --locked --extra dev
+
+      - name: Ruff
+        run: uv run ruff check pdfbatch tests bench
+
+      - name: mypy
+        run: uv run mypy
+
+      # Offline: the tests use synthetic PDFs and mocked APIs, so no secrets are needed.
+      # Tesseract is not installed; the OCR tests fake it.
+      - name: pytest
+        run: uv run pytest
