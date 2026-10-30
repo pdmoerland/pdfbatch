@@ -164,6 +164,16 @@ def _norm_license(lic: str | None) -> str | None:
     return lic
 
 
+def _doi_path(doi: str) -> str:
+    """A DOI as a URL path segment: its own slashes kept, everything else escaped."""
+    return urllib.parse.quote(doi, safe="/")
+
+
+def _dated(date: str | None) -> dict:
+    """Record date fields from a "YYYY[-MM[-DD]]" date: the year is its first four characters."""
+    return {"date": date, "year": date[:4] if date else None}
+
+
 def _page_fields(first: str | None, last: str | None = None) -> dict:
     """Record page fields from a source's first and last page.
 
@@ -189,7 +199,7 @@ def _page_range(pages: str | None) -> dict:
 # ---------------------------------------------------------------------------
 
 def crossref_work(http: Http, doi: str) -> dict | None:
-    body = http.get(f"https://api.crossref.org/works/{urllib.parse.quote(doi, safe='/')}",
+    body = http.get(f"https://api.crossref.org/works/{_doi_path(doi)}",
                     params={"mailto": http.mailto})
     if not body or "message" not in body:
         return None
@@ -225,8 +235,7 @@ def crossref_to_fields(m: dict) -> dict:
         "journal": strip_markup(journal),
         "journal_abbrev": (m.get("short-container-title") or [None])[0],
         "publisher": m.get("publisher"),
-        "date": date,
-        "year": date[:4] if date else None,
+        **_dated(date),
         "volume": m.get("volume"),
         "issue": m.get("issue"),
         "article_number": m.get("article-number"),
@@ -274,7 +283,7 @@ def openalex_work(http: Http, doi: str, api_key: str | None = None) -> dict | No
     preprint's DOI it can return the journal article's record, whose volume, issue, PMID
     and OA status belong to another version.
     """
-    body = http.get(f"https://api.openalex.org/works/doi:{urllib.parse.quote(doi, safe='/')}",
+    body = http.get(f"https://api.openalex.org/works/doi:{_doi_path(doi)}",
                     params=_openalex_params(http, api_key))
     fields = openalex_to_fields(body) if body else None
     return fields if fields and fields["doi"] == doi.lower() else None
@@ -299,8 +308,7 @@ def openalex_to_fields(w: dict) -> dict:
         # For PubMed-only records the "source" is PubMed itself, which is not a journal.
         "journal": None if repository else src.get("display_name"),
         "issn": None if repository else src.get("issn_l"),
-        "date": date,
-        "year": date[:4] if date else None,
+        **_dated(date),
         "volume": bib.get("volume"),
         "issue": bib.get("issue"),
         **_page_fields(bib.get("first_page"), bib.get("last_page")),
@@ -338,7 +346,7 @@ def openalex_search(http: Http, title: str, api_key: str | None = None, rows: in
 # ---------------------------------------------------------------------------
 
 def unpaywall(http: Http, doi: str, email: str) -> OpenAccess | None:
-    body = http.get(f"https://api.unpaywall.org/v2/{urllib.parse.quote(doi, safe='/')}",
+    body = http.get(f"https://api.unpaywall.org/v2/{_doi_path(doi)}",
                     params={"email": email})
     if not body:
         return None
@@ -383,8 +391,7 @@ def arxiv_work(http: Http, arxiv_id: str) -> dict | None:
                     for a in e.findall("a:author", _ATOM)],
         "journal": "arXiv",
         "publisher": "arXiv",
-        "date": date,
-        "year": date[:4] if date else None,
+        **_dated(date),
         "arxiv_id": arxiv_id,
         "doi": f"10.48550/arxiv.{arxiv_id}".lower() if re.match(r"^\d{4}\.", arxiv_id) else None,
         "url": f"https://arxiv.org/abs/{arxiv_id}",
