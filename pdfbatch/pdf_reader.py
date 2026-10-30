@@ -88,8 +88,20 @@ def sha256_file(path: Path) -> str:
     return h.hexdigest()
 
 
+# PyMuPDF does not support use from several threads, not even with separate documents:
+# results can be wrong, or Python can crash (Leptonica, Tesseract's image library, says so
+# outright: "Attempt to use Leptonica from 2 threads at once!"). Worker threads read their
+# PDFs one at a time; their network calls stay parallel.
+_PYMUPDF_LOCK = threading.Lock()
+
+
 def read_pdf(path: Path, sha256: str | None = None) -> PdfContent:
     """`sha256`: the file's hash when the caller already has it (the CLI hashes every PDF)."""
+    with _PYMUPDF_LOCK:
+        return _read_pdf(path, sha256)
+
+
+def _read_pdf(path: Path, sha256: str | None) -> PdfContent:
     doc = pymupdf.open(path)
     try:
         info = {k: v for k, v in (doc.metadata or {}).items() if v}
@@ -137,11 +149,6 @@ _TESSDATA_DIRS = (
 )
 
 
-# Leptonica, Tesseract's image library, refuses use from two threads at once
-# ("Attempt to use Leptonica from 2 threads at once!"); OCR one page at a time.
-_OCR_LOCK = threading.Lock()
-
-
 @cache
 def _tessdata() -> str | None:
     try:
@@ -160,9 +167,8 @@ def _ocr(page) -> pymupdf.TextPage | None:
     if not tessdata:
         return None
     try:
-        with _OCR_LOCK:
-            return page.get_textpage_ocr(flags=pymupdf.TEXTFLAGS_TEXT, language="eng", dpi=300, full=True,
-                                         tessdata=tessdata)
+        return page.get_textpage_ocr(flags=pymupdf.TEXTFLAGS_TEXT, language="eng", dpi=300, full=True,
+                                     tessdata=tessdata)
     except (RuntimeError, pymupdf.mupdf.FzErrorBase):    # a failed OCR leaves the PDF unread, not unopened
         return None
 

@@ -319,6 +319,36 @@ def test_ocr_one_page_at_a_time(scan, monkeypatch):
     assert all(p.ocr for p in results) and most[0] == 1
 
 
+def test_pdfs_are_read_one_at_a_time(pdf_dir, monkeypatch):
+    # PyMuPDF does not support use from several threads, even with separate documents.
+    running, most, real_open = [0], [0], pymupdf.open
+
+    class Tracked:
+        def __init__(self, path):
+            self.doc = real_open(path)
+            running[0] += 1
+            most[0] = max(most[0], running[0])
+            time.sleep(0.05)
+
+        def __getattr__(self, name):
+            return getattr(self.doc, name)
+
+        def __iter__(self):
+            return iter(self.doc)
+
+        def __getitem__(self, i):
+            return self.doc[i]
+
+        def close(self):
+            running[0] -= 1
+            self.doc.close()
+
+    monkeypatch.setattr(pdf_reader.pymupdf, "open", Tracked)
+    with ThreadPoolExecutor(4) as ex:
+        list(ex.map(lambda _: read_pdf(pdf_dir / "doe2024_zebrafish.pdf"), range(4)))
+    assert most[0] == 1
+
+
 def test_scan_without_tesseract(scan, http, monkeypatch):
     monkeypatch.setattr(pdf_reader, "_ocr", lambda page: None)
     r = process_pdf(scan[0], http, settings())
