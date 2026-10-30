@@ -99,7 +99,7 @@ def _mark_duplicates(records) -> None:
     Copies stay separate entries: they are distinct files you hold, with their own
     paths and notes. The note is recomputed every run, so it follows renames.
     """
-    first = {}
+    first: dict[str, Record] = {}
     for r in sorted(records, key=lambda r: r.pdf_path):
         r.notes = [n for n in r.notes if not n.startswith(_SAME_CONTENT)]
         if r.pdf_sha256 and (orig := first.setdefault(r.pdf_sha256, r)) is not r:

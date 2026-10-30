@@ -32,7 +32,7 @@ from .identifiers import clean_doi, find_candidates, other_version_dois
 from .links import LinkChecker, find_links
 from .llm import LlmIdentifier
 from .pdf_reader import PdfContent, abstract_from_text, normalize, read_pdf
-from .record import Author, OpenAccess, Record
+from .record import Author, Confidence, OpenAccess, Record
 
 PREPRINT_DOI_PREFIXES = ("10.1101/", "10.48550/", "10.21203/", "10.20944/", "10.31234/",
                          "10.31219/", "10.36227/", "10.22541/", "10.2139/ssrn")
@@ -168,11 +168,11 @@ def _lookup(http: apis.Http, s: Settings, pdf: PdfContent, doi: str | None, titl
     return _title_search(http, s, pdf, title, surname) if title else (None, "low")
 
 
-def _grobid(s: Settings, path: Path) -> dict | None:
+def _grobid(url: str, path: Path) -> dict | None:
     """Header-only GROBID call → {'title', 'doi'}; zero tokens."""
     try:
         with open(path, "rb") as fh:
-            r = requests.post(f"{s.grobid_url.rstrip('/')}/api/processHeaderDocument",
+            r = requests.post(f"{url.rstrip('/')}/api/processHeaderDocument",
                               files={"input": fh}, data={"consolidateHeader": "0"},
                               headers={"Accept": "application/x-bibtex"}, timeout=120)
     except requests.RequestException:
@@ -202,7 +202,7 @@ def _fallbacks(http: apis.Http, s: Settings, pdf: PdfContent) -> Iterator[Hit]:
     queries = (*pdf.title_guesses, pdf.info.get("title"), pdf.opening)
     for title in dict.fromkeys(t for t in queries if t and len(t) >= 15):
         yield (*_title_search(http, s, pdf, title), "title-search")
-    if s.grobid_url and (g := _grobid(s, pdf.path)):
+    if s.grobid_url and (g := _grobid(s.grobid_url, pdf.path)):
         yield (*_lookup(http, s, pdf, g["doi"], g["title"]), "grobid")
     if s.llm and pdf.page_texts and (key := s.llm.identify(pdf.page_texts[0])):
         yield (*_lookup(http, s, pdf, key.get("doi"), key["title"], key.get("first_author_surname")), "llm-key")
@@ -217,7 +217,7 @@ def _merge(rec: Record, f: dict, *, override: bool = False) -> None:
             setattr(rec, k, v)
 
 
-def _apply(rec: Record, f: dict, conf: str, how: str) -> None:
+def _apply(rec: Record, f: dict, conf: Confidence, how: str) -> None:
     _merge(rec, f, override=True)
     rec.confidence = conf
     rec.resolved_via = [how, f["_via"]]
@@ -229,7 +229,8 @@ def _apply(rec: Record, f: dict, conf: str, how: str) -> None:
 
 
 def identify(http: apis.Http, s: Settings, pdf: PdfContent, rec: Record) -> None:
-    hit, near = _best_candidate(http, s, pdf), {}
+    hit = _best_candidate(http, s, pdf)
+    near: dict[str | None, dict] = {}
     if not hit:
         for h in _fallbacks(http, s, pdf):
             if _good(h[1]):
@@ -238,7 +239,9 @@ def identify(http: apis.Http, s: Settings, pdf: PdfContent, rec: Record) -> None
             if h[0]:                           # a near miss from a title search
                 near.setdefault(h[0].get("doi") or h[0].get("url") or h[0].get("title"), h[0])
     if hit:
-        _apply(rec, *hit)
+        f, conf, how = hit
+        assert f is not None and conf != "low"    # a good hit carries its record
+        _apply(rec, f, conf, how)
         return
     rec.resolved_via = ["pdf-only"]
     rec.title = pdf.title_guess or pdf.info.get("title") or pdf.path.stem

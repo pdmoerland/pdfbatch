@@ -48,8 +48,8 @@ def _retry_after(value: str | None, default: float) -> float:
     """Seconds to wait: the server's Retry-After (decimals too), capped; `default` for an
     HTTP-date or no header."""
     try:
-        return max(0.0, min(float(value), MAX_RETRY_AFTER))      # never negative
-    except (TypeError, ValueError):
+        return max(0.0, min(float(value or ""), MAX_RETRY_AFTER))      # never negative
+    except ValueError:
         return default
 
 
@@ -136,7 +136,7 @@ def strip_markup(s: str | None) -> str | None:
 
 def _date_from_parts(obj: dict | None) -> str | None:
     try:
-        parts = obj["date-parts"][0]
+        parts = (obj or {})["date-parts"][0]
     except (TypeError, KeyError, IndexError):
         return None
     parts = [p for p in parts if p]

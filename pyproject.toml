@@ -18,6 +18,8 @@ dependencies = [
 dev = [
     "pytest>=7.4.0",
     "ruff>=0.6",
+    "mypy>=1.10",
+    "types-requests",
 ]
 
 [project.scripts]
@@ -41,3 +43,10 @@ line-length = 130
 [tool.ruff.lint]
 select = ["E", "F", "W", "B", "UP"]
 ignore = ["E731"]
+
+[tool.mypy]
+files = ["pdfbatch", "bench", "tests"]
+
+[[tool.mypy.overrides]]
+module = ["diskcache"]                # ships no type information
+ignore_missing_imports = true

@@ -30,7 +30,7 @@ RIS_TYPES = {
 }
 
 
-def _one_line(s: str) -> str:
+def _one_line(s: str | None) -> str:
     return re.sub(r"\s+", " ", s or "").strip()
 
 
@@ -126,7 +126,7 @@ def ris_entry(r: Record, *, preprint_type: str = "JOUR", attach: str = "uri") ->
         if val not in (None, "", []):
             lines.append(f"{tag}  - {_one_line(str(val))}")
 
-    add("TY", preprint_type if r.is_preprint else RIS_TYPES.get(r.item_type, "JOUR"))
+    add("TY", preprint_type if r.is_preprint else RIS_TYPES.get(r.item_type or "", "JOUR"))
     for a in r.authors:
         add("AU", a.ris())
     add("TI", r.title)

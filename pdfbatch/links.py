@@ -293,7 +293,7 @@ def find_links(pdf: PdfContent, checker: LinkChecker | None = None) -> list[Link
     in_text = [f for f in in_text if f.url in hyperlinks or not any(u.startswith(f.url) for u in hyperlinks)]
     found = [f for f in _first_per_url(in_text + annotated) if own(f)]
     label = labels(text, found)
-    seen = Counter()
+    seen: Counter[str] = Counter()
     out = []
     for f in found:
         seen[f.kind] += 1

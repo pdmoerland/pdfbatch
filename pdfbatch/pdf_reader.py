@@ -109,7 +109,7 @@ def _read_pdf(path: Path, sha256: str | None) -> PdfContent:
             xmp = doc.get_xml_metadata() or ""
         except Exception:                      # noqa: BLE001
             xmp = ""
-        page_texts = [p.get_text("text") for p in doc]
+        page_texts = [p.get_text("text") for p in doc.pages()]
         hf, titles, ocr = "", [], False
         if doc.page_count:
             page = doc[0]
@@ -119,7 +119,7 @@ def _read_pdf(path: Path, sha256: str | None) -> PdfContent:
                 page_texts[0] = tp.extractText()
             hf = _header_footer_text(tp, page.rect)
             titles = _title_guesses(tp, page.rect)
-        uris = [u for page in doc for ln in page.get_links()
+        uris = [u for page in doc.pages() for ln in page.get_links()
                 if (u := ln.get("uri") or "").startswith(("http://", "https://"))]
         return PdfContent(
             path=path,
@@ -216,14 +216,14 @@ def _title_guesses(tp, rect) -> list[str]:
             # titled "Microarray 1", and the stray digit alone can make a title search miss.
             text = " ".join(s["text"].strip() for s in spans if s["size"] >= 0.7 * size)
             lines.append((round(size, 1), line["bbox"][1], text))
-    chars = Counter()
+    chars: Counter[float] = Counter()
     for s, _, t in lines:
         chars[s] += len(t)
     body = chars.most_common(1)[0][0] if chars else 0
     guesses = []
     for size in sorted({s for s, _, _ in lines}, reverse=True)[:3]:
         pitch = _DISPLAY_LINE_PITCH if size >= 1.2 * body else _TITLE_LINE_PITCH
-        run = []                               # the first vertically contiguous run at this size
+        run: list[tuple[float, str]] = []      # the first vertically contiguous run at this size
         for _, y, t in sorted((ln for ln in lines if abs(ln[0] - size) < 0.6), key=lambda ln: ln[1]):
             if run and y - run[-1][0] > size * pitch:
                 break

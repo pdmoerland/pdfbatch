@@ -38,7 +38,7 @@ def make_pdfs(d: Path) -> None:
     # A — journal article: DOI in the running header, a decoy DOI cited on page 1,
     #     own code/data in availability statements, cited tools in references.
     doc = pymupdf.open()
-    items = [(50, 40, "Nature Methods | Volume 21 | June 2024 | 1012-1024", 8),
+    items: list[tuple] = [(50, 40, "Nature Methods | Volume 21 | June 2024 | 1012-1024", 8),
              (50, 52, "https://doi.org/10.1038/s41592-024-02201-0", 8),
              (50, 110, "Single-cell atlas of regulatory syntax in", 20),
              (50, 136, "the developing zebrafish heart", 20),
