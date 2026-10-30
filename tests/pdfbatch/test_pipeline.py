@@ -610,6 +610,18 @@ def test_retry_unresolved(tmp_path, http, monkeypatch):
 
 # --------------------------------------------------------------------------- benchmark
 
+def test_outputs_are_sorted(tmp_path):
+    # Worker threads finish in any order; the files must not depend on it.
+    recs = [Record(pdf_path=f"/p/{name}", title="Same paper", year="2024", authors=[Author(fam, "A")])
+            for name, fam in (("b_copy.pdf", "Doe"), ("a_copy.pdf", "Doe"), ("z.pdf", "Abel"))]
+    for i, order in enumerate((recs, recs[::-1])):
+        write_json(order, tmp_path / f"{i}.json")
+        writers.write_ris(order, tmp_path / f"{i}.ris", attach="none")
+    assert (tmp_path / "0.json").read_bytes() == (tmp_path / "1.json").read_bytes()
+    assert (tmp_path / "0.ris").read_bytes() == (tmp_path / "1.ris").read_bytes()
+    assert [Path(r.pdf_path).name for r in read_json(tmp_path / "0.json")] == ["z.pdf", "a_copy.pdf", "b_copy.pdf"]
+
+
 def test_benchmark_scoring():
     from bench.run_benchmark import changes, score
 

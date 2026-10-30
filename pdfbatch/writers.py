@@ -35,8 +35,10 @@ def _one_line(s: str) -> str:
 
 
 def sort_key(r: Record):
+    """The one order of all three files: first author, year, title; ties (identical copies of
+    one PDF) by path, so no file depends on the order in which worker threads finished."""
     first = (r.authors[0].family or r.authors[0].literal) if r.authors else ""
-    return ((first or "~").lower(), r.year or "", (r.title or "").lower())
+    return ((first or "~").lower(), r.year or "", (r.title or "").lower(), r.pdf_path)
 
 
 def _write_atomic(path: Path, text: str, *, newline: str | None = None) -> None:
@@ -237,7 +239,7 @@ def write_markdown(records: list[Record], path: Path, *, llm_usage: str = "") ->
 # ---------------------------------------------------------------------------
 
 def write_json(records: list[Record], path: Path) -> None:
-    _write_atomic(path, json.dumps([r.to_dict() for r in records], indent=2, ensure_ascii=False))
+    _write_atomic(path, json.dumps([r.to_dict() for r in sorted(records, key=sort_key)], indent=2, ensure_ascii=False))
 
 
 def read_json(path: Path) -> list[Record]:
