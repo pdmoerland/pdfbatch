@@ -296,4 +296,4 @@ Principles applied in [iteration 4](docs/plans/2026-10-02-refactor-minimal-elega
 | 7 | [The right version, and only the paper's own links](docs/plans/2026-10-13-fix-versions-and-own-links-plan.md) | `92042ef`, `2671d54`, `60cfd1b` |
 | 8 | [Your own notes](docs/plans/2026-10-14-feat-user-notes-plan.md) | `b385031` |
 | 9 | [Robustness fixes and an accuracy benchmark](docs/plans/2026-10-30-fix-robustness-and-benchmark-plan.md) | `f240d2a` … `33fb1b3` |
-| 10 | [Only the version you hold](docs/plans/2026-10-30-refactor-held-version-only-plan.md) | see the plan |
+| 10 | [Only the version you hold](docs/plans/2026-10-30-refactor-held-version-only-plan.md) | `3958a87` |
