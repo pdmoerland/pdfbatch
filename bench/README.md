@@ -32,7 +32,7 @@ Nothing personal is committed: `bench/pdfs/`, `bench/gold.csv` and `bench/result
 uv run python bench/run_benchmark.py run --pdfs bench/pdfs --gold bench/gold.csv
 ```
 
-`--mailto`, `--openalex-key`, `--grobid`, `--llm`, `--llm-model`, `--ollama-url`, `--workers` and `--cache-dir` mean what they mean for `pdf-batch`. Each run writes `bench/results/<timestamp>-<git short hash>.json` (`-dirty` when `pdfbatch/` has uncommitted changes) and prints:
+`--mailto`, `--openalex-key`, `--grobid`, `--llm`, `--llm-model`, `--ollama-url`, `--workers` and `--cache-dir` mean what they mean for `pdf-batch` (so the default cache is the same per-user folder: `PDFBATCH_CACHE_DIR`, else e.g. `%LOCALAPPDATA%\pdfbatch\Cache` or `~/.cache/pdfbatch`). Each run writes `bench/results/<timestamp>-<git short hash>.json` (`-dirty` when `pdfbatch/` has uncommitted changes) and prints:
 
 - per outcome, its count and percentage:
 

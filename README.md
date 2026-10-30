@@ -14,7 +14,7 @@ uv run pdf-batch ~/papers --mailto you@uni.nl --unpaywall
 
 **Scanned PDFs (optional):** install [Tesseract](https://tesseract-ocr.github.io/tessdoc/Installation.html) (on Windows the [UB Mannheim build](https://github.com/UB-Mannheim/tesseract/wiki), or `winget install UB-Mannheim.TesseractOCR`) and page 1 of a PDF without a text layer is OCR'd automatically. Tesseract is found via `TESSDATA_PREFIX`, on `PATH`, or in its standard install folder (the Windows installer does not add it to `PATH`). Without Tesseract such PDFs are flagged.
 
-`CONTACT_MAILTO` in a `.env` file (searched from the current directory upwards; see `.env.example`) works instead of `--mailto`. Reruns are incremental: PDFs are keyed by SHA-256, so only new files are processed and renamed files are recognised. Use `--force` to redo everything.
+`CONTACT_MAILTO` in a `.env` file (searched from the current directory upwards; see `.env.example`) works instead of `--mailto`. Reruns are incremental: PDFs are keyed by SHA-256, so only new files are processed and renamed files are recognised. Use `--force` to redo everything. If `papers.json` cannot be read (say, edited by hand into invalid JSON), it is kept as `papers.json.bak` and every PDF is processed again.
 
 ## How each PDF is identified (cheapest first)
 
@@ -97,7 +97,7 @@ Every run puts each note under the paper's citation in `papers.md`, and in `pape
 | `--llm-model`, `--ollama-url` (env `OLLAMA_URL`) | Model and server for the `--llm` tier (defaults: `claude-haiku-4-5`, `qwen3:8b` at `http://localhost:11434`) |
 | `--workers 4` | Number of PDFs processed in parallel. APIs are throttled per host |
 | `--retry-unresolved` | Re-process only the PDFs left unresolved last time, e.g. after adding `--grobid`, `--llm` or Tesseract (`--force` redoes everything) |
-| `--cache-dir DIR` | Where API responses and link checks are cached for 30 days (default: `.pdfbatch_cache/` in the current folder) |
+| `--cache-dir DIR` | Where API responses and link checks are cached for 30 days. Default: `PDFBATCH_CACHE_DIR` if set, else the per-user cache folder: `%LOCALAPPDATA%\pdfbatch\Cache` (Windows), `~/Library/Caches/pdfbatch` (macOS), `$XDG_CACHE_HOME/pdfbatch` or `~/.cache/pdfbatch` (Linux). A `.pdfbatch_cache/` folder from earlier versions is no longer used and can be deleted; it may contain your OpenAlex API key |
 
 Run `pdf-batch --help` for the full list.
 

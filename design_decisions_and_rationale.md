@@ -176,6 +176,8 @@ Every run writes three files to `<input>/_metadata/` ([`writers.py`](pdfbatch/wr
 
 The full records, and the only file that is read back.
 
+All three files are written to a temporary file in the same folder and then renamed over the old one, so an interrupted run never leaves a truncated `papers.json`. A `papers.json` that cannot be read is not silently replaced: it is kept as `papers.json.bak`, the run says so, and every PDF is processed again.
+
 ### `papers.ris`
 
 For import into EndNote or Zotero.
@@ -247,8 +249,8 @@ All HTTP goes through one shared `Http` instance ([`apis.py`](pdfbatch/apis.py))
 
 - **User-Agent** with `mailto:`. This gets CrossRef and OpenAlex "polite pool" treatment, which is why `--mailto` / `CONTACT_MAILTO` is required.
 - **Throttling** per host: 0.12 s between requests in general, and 3 s for arXiv, as its API terms ask. Each worker thread reserves its own slot under a lock and sleeps outside it, so two threads never hit a host at once and a wait for one host does not hold up the others.
-- **Retries** on 429/5xx with exponential backoff, honouring `Retry-After`.
-- **A 30-day disk cache** in `.pdfbatch_cache/`. 404s are cached too, so reruns and repeated lookups are nearly free.
+- **Retries** on 429/5xx with exponential backoff, honouring `Retry-After` up to 60 s: a server asking for an hour must not stall a worker that long.
+- **A 30-day disk cache** in one per-user folder (`PDFBATCH_CACHE_DIR`, else `%LOCALAPPDATA%\pdfbatch\Cache`, `~/Library/Caches/pdfbatch` or `~/.cache/pdfbatch`), shared by runs from any folder and kept out of synced project folders. 404s are cached too, so reruns and repeated lookups are nearly free. API keys are sent but are not part of cache keys, so they are never written to the cache file.
 
 PDFs are processed by four worker threads by default (`--workers`). The work is network-bound, and the shared throttle keeps parallelism polite.
 
@@ -297,3 +299,4 @@ Principles applied in [iteration 4](docs/plans/2026-10-02-refactor-minimal-elega
 | 8 | [Your own notes](docs/plans/2026-10-14-feat-user-notes-plan.md) | `b385031` |
 | 9 | [Robustness fixes and an accuracy benchmark](docs/plans/2026-10-30-fix-robustness-and-benchmark-plan.md) | `f240d2a` … `33fb1b3` |
 | 10 | [Only the version you hold](docs/plans/2026-10-30-refactor-held-version-only-plan.md) | `3958a87` |
+| 11 | [Code review fixes](docs/plans/2026-10-30-fix-review-findings-plan.md) | `29a46bc` … `73b4eb2` |
