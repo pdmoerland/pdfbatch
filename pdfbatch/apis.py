@@ -391,8 +391,7 @@ def arxiv_work(http: Http, arxiv_id: str) -> dict | None:
         "abstract": re.sub(r"\s+", " ", txt("a:summary")) or None,
         "related_doi": pub_doi,
         "related_relation": "is-preprint-of" if pub_doi else None,
-        "oa": OpenAccess(is_oa=True, status="green", version="submittedVersion",
-                         url=f"https://arxiv.org/abs/{arxiv_id}", source="rule"),
+        "oa": OpenAccess.preprint_server(f"https://arxiv.org/abs/{arxiv_id}"),
     }
 
 

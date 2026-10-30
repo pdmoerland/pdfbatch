@@ -306,8 +306,7 @@ def enrich(http: apis.Http, s: Settings, pdf: PdfContent, rec: Record) -> None:
     if preprint_doi:
         rec.is_preprint, rec.item_type = True, "preprint"
     if not rec.oa.status and (preprint_doi or rec.arxiv_id):
-        rec.oa = OpenAccess(is_oa=True, status="green", version="submittedVersion", source="rule",
-                            url=rec.url if preprint_doi else f"https://arxiv.org/abs/{rec.arxiv_id}")
+        rec.oa = OpenAccess.preprint_server(rec.url if preprint_doi else f"https://arxiv.org/abs/{rec.arxiv_id}")
     if rec.doi and not rec.oa.status:
         rec.notes.append("No OA information found for this DOI.")
 

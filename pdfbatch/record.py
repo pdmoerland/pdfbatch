@@ -64,6 +64,11 @@ class OpenAccess:
     url: str | None = None           # best free copy
     source: str | None = None        # 'unpaywall' | 'openalex' | 'rule'
 
+    @classmethod
+    def preprint_server(cls, url: str | None) -> OpenAccess:
+        """The rule for arXiv, bioRxiv and the like: green OA by definition, as submitted."""
+        return cls(is_oa=True, status="green", version="submittedVersion", url=url, source="rule")
+
 
 @dataclass
 class Record:
