@@ -610,6 +610,15 @@ def test_retry_unresolved(tmp_path, http, monkeypatch):
 
 # --------------------------------------------------------------------------- benchmark
 
+def test_unpaywall_is_the_default(protocol_only, tmp_path, monkeypatch):
+    emails = []
+    monkeypatch.setattr(cli, "process_pdf", lambda p, http, s, h: emails.append(s.unpaywall_email)
+                        or Record(pdf_path=str(p), pdf_sha256=h))
+    assert _run_cli(protocol_only, tmp_path, "--force") == 0
+    assert _run_cli(protocol_only, tmp_path, "--force", "--no-unpaywall") == 0
+    assert emails == ["t@example.org", None]
+
+
 def test_outputs_are_sorted(tmp_path):
     # Worker threads finish in any order; the files must not depend on it.
     recs = [Record(pdf_path=f"/p/{name}", title="Same paper", year="2024", authors=[Author(fam, "A")])

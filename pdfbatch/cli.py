@@ -1,6 +1,6 @@
 """Batch PDF -> metadata (.md + .ris + .json), DOI-first.
 
-    pdf-batch ~/papers --mailto you@uni.nl --unpaywall
+    pdf-batch ~/papers --mailto you@uni.nl
 
 See README.md for every option.
 """
@@ -73,8 +73,9 @@ def _arguments(argv) -> argparse.Namespace:
     ap.add_argument("--name", default="papers", help="base name of output files (default: papers)")
     ap.add_argument("--recursive", action="store_true", help="include PDFs in subdirectories")
     add_lookup_options(ap)
-    ap.add_argument("--unpaywall", action="store_true",
-                    help="also query Unpaywall for OA status (uses --mailto; needs a real address)")
+    ap.add_argument("--unpaywall", action=argparse.BooleanOptionalAction, default=True,
+                    help="query Unpaywall for OA status, licence and version (default: on; uses --mailto, "
+                         "which must then be a real address, else OpenAlex's OA data is used)")
     ap.add_argument("--check-links", action="store_true", help="HEAD-check code links")
     ap.add_argument("--preprint-ris-type", default="JOUR",
                     help="RIS TY for preprints: JOUR (default, imports cleanly everywhere) or UNPB")
