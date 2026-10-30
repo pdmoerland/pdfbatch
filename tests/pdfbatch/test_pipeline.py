@@ -553,7 +553,7 @@ def test_throttle_spaces_concurrent_requests(monkeypatch):
             return {}
 
     def fake_get(url, params=None, timeout=None):
-        stamps.append(time.monotonic())
+        stamps.append(time.perf_counter())
         return Ok()
 
     h = apis.Http("t@example.org", cache_dir=None)

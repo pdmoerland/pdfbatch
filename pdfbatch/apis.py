@@ -70,11 +70,13 @@ class Http:
 
         The slot is reserved under the lock and slept for outside it: worker threads
         each claim a distinct time, and a wait for one host does not hold up the others.
+        `perf_counter`, not `monotonic`: before Python 3.13, Windows' monotonic clock
+        ticks every 15.6 ms, so slots could come up to 15 ms early.
         """
         with self._lock:
-            slot = max(time.monotonic(), self._last.get(host, 0) + min_interval)
+            slot = max(time.perf_counter(), self._last.get(host, 0) + min_interval)
             self._last[host] = slot
-        wait = slot - time.monotonic()
+        wait = slot - time.perf_counter()
         if wait > 0:
             time.sleep(wait)
 
