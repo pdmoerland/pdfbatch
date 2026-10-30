@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import time
 from concurrent.futures import ThreadPoolExecutor
+from itertools import pairwise
 from pathlib import Path
 
 import pymupdf
@@ -148,7 +149,7 @@ def test_journal_article(pdf_dir, http):
     assert r.oa.status == "hybrid" and r.oa.license == "cc-by" and r.oa.source == "unpaywall"
     assert r.pmid == "38400001"
     assert r.abstract_source == "europepmc"
-    urls = {l.url: l for l in r.links}
+    urls = {link.url: link for link in r.links}
     assert "https://github.com/vanderberglab/zebraheart" in urls
     assert "https://doi.org/10.5281/zenodo.1234567" in urls
     assert "https://github.com/smithlab/othertool" not in urls     # cited in References
@@ -187,7 +188,8 @@ def test_title_below_a_larger_banner(tmp_path, http):
                          (50, 110, "Phase separation of transcription factors", 19),
                          (50, 135, "in plant immunity", 19),
                          (50, 170, "Anna Jansen and Bram de Vries", 11)])
-    doc.save(tmp_path / "working_paper.pdf"); doc.close()
+    doc.save(tmp_path / "working_paper.pdf")
+    doc.close()
     r = process_pdf(tmp_path / "working_paper.pdf", http, settings())
     assert r.doi == "10.1105/tpc.23.00001" and r.confidence == "high"
 
@@ -202,7 +204,8 @@ def scan(tmp_path):
     doc = pymupdf.open()
     doc.new_page(width=595, height=842).insert_image(pymupdf.Rect(0, 0, 595, 842),
                                                       pixmap=text[0].get_pixmap(dpi=100))
-    doc.save(tmp_path / "scan.pdf"); doc.close()
+    doc.save(tmp_path / "scan.pdf")
+    doc.close()
     yield tmp_path / "scan.pdf", text[0]
     text.close()
 
@@ -261,7 +264,8 @@ def test_all_caps_title_page(tmp_path, http):
                          (50, 90, "A R T I C L E S", 13),
                          (50, 290, "PROBABILISTIC METHODS TO SEARCH", 12),
                          (50, 304, "FOR REGULATORY ELEMENTS", 12)])
-    doc.save(tmp_path / "thesis.pdf"); doc.close()
+    doc.save(tmp_path / "thesis.pdf")
+    doc.close()
     assert read_pdf(tmp_path / "thesis.pdf").title_guesses[0] == \
         "PROBABILISTIC METHODS TO SEARCH FOR REGULATORY ELEMENTS"
     r = process_pdf(tmp_path / "thesis.pdf", http, settings())
@@ -326,11 +330,11 @@ def test_url_cut_by_a_line_number():
     pdf = PdfContent(path=Path("x.pdf"), sha256="", info={}, xmp="", header_footer_text="", title_guesses=[],
                      page_texts=["The source code is available at https://github.com/DBinary/STARN\n1472\net."],
                      link_uris=["https://github.com/DBinary/STARNet"])
-    assert [l.url for l in find_links(pdf)] == ["https://github.com/DBinary/STARNet"]
+    assert [link.url for link in find_links(pdf)] == ["https://github.com/DBinary/STARNet"]
 
 
 def _links_in(text, uris=()):
-    return [l.url for l in find_links(PdfContent(path=Path("x.pdf"), sha256="", info={}, xmp="", header_footer_text="",
+    return [link.url for link in find_links(PdfContent(path=Path("x.pdf"), sha256="", info={}, xmp="", header_footer_text="",
                                                  title_guesses=[], page_texts=[text], link_uris=list(uris)))]
 
 
@@ -421,7 +425,8 @@ def test_read_notes(tmp_path):
 
 
 def test_notes_survive_reruns(pdf_dir, http, tmp_path, capsys):
-    out = tmp_path / "out"; out.mkdir()
+    out = tmp_path / "out"
+    out.mkdir()
     notes = out / "notes.md"
     notes.write_text("## DOE2024_ZEBRAFISH.pdf\nKey reference for the atlas.\n\n## gone.pdf\nOld note.\n",
                      encoding="utf-8")
@@ -458,7 +463,7 @@ def test_throttle_spaces_concurrent_requests(monkeypatch):
         list(ex.map(lambda i: h.get("https://api.example.org/x", {"i": i}, min_interval=0.05), range(8)))
     stamps.sort()
     assert len(stamps) == 8
-    assert min(b - a for a, b in zip(stamps, stamps[1:])) >= 0.045
+    assert min(b - a for a, b in pairwise(stamps)) >= 0.045
 
 
 def _run_cli(src, tmp_path, *extra):
@@ -467,7 +472,8 @@ def _run_cli(src, tmp_path, *extra):
 
 
 def test_duplicate_pdfs_keep_their_paths(pdf_dir, http, tmp_path):
-    src = tmp_path / "src"; src.mkdir()
+    src = tmp_path / "src"
+    src.mkdir()
     for name in ("a_copy.pdf", "b_copy.pdf"):
         (src / name).write_bytes((pdf_dir / "scan_0042.pdf").read_bytes())
     assert _run_cli(src, tmp_path) == 0
@@ -480,7 +486,8 @@ def test_duplicate_pdfs_keep_their_paths(pdf_dir, http, tmp_path):
 
 @pytest.fixture
 def protocol_only(pdf_dir, tmp_path):
-    src = tmp_path / "src"; src.mkdir()
+    src = tmp_path / "src"
+    src.mkdir()
     (src / "protocol.pdf").write_bytes((pdf_dir / "protocol.pdf").read_bytes())
     return src
 
@@ -511,11 +518,13 @@ def test_llm_bad_reply_keeps_record(protocol_only, http, tmp_path, monkeypatch, 
 
 
 def test_retry_unresolved(tmp_path, http, monkeypatch):
-    src = tmp_path / "src"; src.mkdir()
+    src = tmp_path / "src"
+    src.mkdir()
     doc = pymupdf.open()
     fixtures._page(doc, [(50, 100, "Buffer preparation for chromatin accessibility assays", 18),
                          (50, 140, "Anna Jansen and Bram de Vries", 11)])
-    doc.save(src / "buffers.pdf"); doc.close()
+    doc.save(src / "buffers.pdf")
+    doc.close()
     confidence = lambda: read_json(tmp_path / "out" / "papers.json")[0].confidence
     assert _run_cli(src, tmp_path) == 0 and confidence() == "unresolved"
 

@@ -21,6 +21,7 @@ from typing import Any, Dict, List, Optional
 import diskcache
 import requests
 
+from . import __version__
 from .record import Author, OpenAccess
 
 _RETRY = {429, 500, 502, 503, 504}
@@ -34,7 +35,7 @@ class Http:
         self.timeout = timeout
         self.ttl = ttl_days * 86400
         self.session = requests.Session()
-        self.session.headers["User-Agent"] = f"pdfbatch/1.0 (mailto:{mailto})"
+        self.session.headers["User-Agent"] = f"pdfbatch/{__version__} (mailto:{mailto})"
         self.cache = diskcache.Cache(str(cache_dir)) if cache_dir else None
         self._last: Dict[str, float] = {}
         self._lock = threading.Lock()
@@ -68,7 +69,8 @@ class Http:
             except requests.RequestException:
                 if attempt == retries:
                     return None
-                time.sleep(delay); delay *= 2
+                time.sleep(delay)
+                delay *= 2
                 continue
             if r.status_code == 404:
                 if self.cache is not None:
@@ -76,7 +78,8 @@ class Http:
                 return None
             if r.status_code in _RETRY and attempt < retries:
                 ra = r.headers.get("Retry-After")
-                time.sleep(float(ra) if ra and ra.isdigit() else delay); delay *= 2
+                time.sleep(float(ra) if ra and ra.isdigit() else delay)
+                delay *= 2
                 continue
             if r.status_code != 200:
                 return None
@@ -188,8 +191,8 @@ def crossref_to_fields(m: dict) -> dict:
                                      if item.get("id-type") == "doi"), (None, None))
     issn = next((t["value"] for t in m.get("issn-type") or [] if t.get("type") == "print"),
                 (m.get("ISSN") or [None])[0])
-    lic = next((_norm_license(l.get("URL")) for l in m.get("license") or []
-                if l.get("content-version") in ("vor", "unspecified")), None)
+    lic = next((_norm_license(entry.get("URL")) for entry in m.get("license") or []
+                if entry.get("content-version") in ("vor", "unspecified")), None)
     return {
         "item_type": "preprint" if is_preprint else ctype,
         "is_preprint": is_preprint,

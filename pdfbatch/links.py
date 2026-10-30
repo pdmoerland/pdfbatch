@@ -11,6 +11,7 @@ from typing import Callable, Dict, Iterable, List, Optional, Sequence
 import diskcache
 import requests
 
+from . import __version__
 from .identifiers import REFS_HEADING_RE
 from .pdf_reader import PdfContent
 from .record import Link
@@ -91,7 +92,8 @@ PLATFORMS: List[Platform] = [          # order matters: first match wins
              _canon(r"(?:zenodo\.org/records?/|doi\.org/10\.5281/zenodo\.)(\d+)", "https://doi.org/10.5281/zenodo.{}"),
              probe=False),
     Platform("figshare", "data",
-             re.compile(r"https?://(?:(?:www\.)?figshare\.com/(?:articles|s|projects)/\S+|doi\.org/10\.6084/m9\.figshare\.\d+)", re.I),
+             re.compile(r"https?://(?:(?:www\.)?figshare\.com/(?:articles|s|projects)/\S+"
+                        r"|doi\.org/10\.6084/m9\.figshare\.\d+)", re.I),
              _canon(r"figshare\.com/(?:articles|s|projects)/(?:[^/]+/)?(\d+)", "https://figshare.com/articles/{}"),
              probe=False),
     Platform("dryad", "data",
@@ -216,7 +218,7 @@ class LinkChecker:
     def _head(self, url: str) -> bool:
         try:
             r = requests.head(url, timeout=self.timeout, allow_redirects=True,     # GitHub refuses HEAD without a UA
-                              headers={"User-Agent": "pdfbatch-link-check/1.0", "Accept": "*/*"})
+                              headers={"User-Agent": f"pdfbatch-link-check/{__version__}", "Accept": "*/*"})
         except requests.RequestException:
             return False
         return r.status_code < 400 or r.status_code == 429                        # 429: rate-limited, not dead

@@ -116,9 +116,9 @@ def main(argv=None) -> int:
     # Reruns are incremental: PDFs are keyed by content, so renamed files are recognised.
     json_path = out / f"{args.name}.json"
     known = {} if args.force else {r.pdf_sha256: r for r in read_json(json_path)}
-    records, todo = [], []
+    records, todo, hashes = [], [], {p: sha256_file(p) for p in pdfs}
     for p in pdfs:
-        rec = known.get(sha256_file(p))
+        rec = known.get(hashes[p])
         if rec and not (args.retry_unresolved and rec.confidence == "unresolved"):
             rec = copy.deepcopy(rec)           # identical files share a hash, not a record
             rec.pdf_path = str(p)
@@ -129,7 +129,7 @@ def main(argv=None) -> int:
 
     def process(p: Path) -> Record:
         try:
-            return process_pdf(p, http, settings)
+            return process_pdf(p, http, settings, hashes[p])
         except Exception as e:                 # noqa: BLE001 — never lose the whole batch
             return Record(pdf_path=str(p), title=p.stem, notes=[f"Crashed: {e!r}"])
 

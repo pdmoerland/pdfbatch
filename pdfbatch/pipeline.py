@@ -300,10 +300,10 @@ def enrich(http: apis.Http, s: Settings, pdf: PdfContent, rec: Record) -> None:
 
 # ---------------------------------------------------------------------------
 
-def process_pdf(path: Path, http: apis.Http, s: Settings) -> Record:
+def process_pdf(path: Path, http: apis.Http, s: Settings, sha256: Optional[str] = None) -> Record:
     rec = Record(pdf_path=str(path.resolve()))
     try:
-        pdf = read_pdf(path)
+        pdf = read_pdf(path, sha256)
     except Exception as e:                     # noqa: BLE001 — an unreadable PDF is a result, not a crash
         rec.title = path.stem
         rec.notes.append(f"Could not open PDF: {e}")

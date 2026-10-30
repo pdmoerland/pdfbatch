@@ -134,7 +134,7 @@ def ris_entry(r: Record, *, preprint_type: str = "JOUR", attach: str = "uri") ->
     if r.oa.license:
         add("KW", f"License: {r.oa.license}")
     for kind in ("code", "data"):
-        if any(l.kind == kind for l in r.links):
+        if any(link.kind == kind for link in r.links):
             add("KW", f"Has {kind}")
     if r.needs_review:
         add("KW", "pdfbatch: needs review")
@@ -144,7 +144,7 @@ def ris_entry(r: Record, *, preprint_type: str = "JOUR", attach: str = "uri") ->
         details = _oa_details(r)
         notes.append(f"Open access: {r.oa.status}" + (f", {details}" if details else "")
                      + (f" ({r.oa.url})" if r.oa.url else "") + f" [via {r.oa.source}]")
-    notes += [f"{l.kind.capitalize()}{f' ({l.label})' if l.label else ''}: {l.url}" for l in r.links]
+    notes += [f"{link.kind.capitalize()}{f' ({link.label})' if link.label else ''}: {link.url}" for link in r.links]
     notes += r.notes
     notes.append(f"pdfbatch: {r.confidence} confidence via {' > '.join(r.resolved_via)}")
     add("N1", r.user_notes)                    # yours as a note of its own (Zotero: a separate note)
@@ -181,9 +181,10 @@ def _md_entry(r: Record) -> List[str]:
     out.append(f"**Open access:** {r.oa.status or 'unknown'}" + (f" ({details})" if details else "")
                + (f" — [free copy]({r.oa.url})" if r.oa.url else "") + "  ")
     for kind in ("code", "data"):
-        if ls := [l for l in r.links if l.kind == kind]:
+        if ls := [link for link in r.links if link.kind == kind]:
             out.append(f"**{kind.capitalize()}:** " + ", ".join(
-                f"[{l.url.split('://', 1)[-1]}]({l.url})" + (f" — {l.label}" if l.label else "") for l in ls) + "  ")
+                f"[{link.url.split('://', 1)[-1]}]({link.url})" + (f" — {link.label}" if link.label else "")
+                for link in ls) + "  ")
     out.append(f"**Resolved:** {r.confidence} confidence via {' → '.join(r.resolved_via)}")
     out += [f"\n⚠️ {n}" for n in r.notes]
     return out + ["", "---", ""]

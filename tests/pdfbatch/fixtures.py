@@ -24,7 +24,8 @@ def _para(text, width=90):
     words, lines, cur = text.split(), [], ""
     for w in words:
         if len(cur) + len(w) + 1 > width:
-            lines.append(cur); cur = w
+            lines.append(cur)
+            cur = w
         else:
             cur = f"{cur} {w}".strip()
     lines.append(cur)
@@ -45,7 +46,8 @@ def make_pdfs(d: Path) -> None:
              (50, 210, "Abstract", 12)]
     y = 228
     for line in _para(LOREM + " " + LOREM):
-        items.append((50, y, line, 9)); y += 12
+        items.append((50, y, line, 9))
+        y += 12
     items.append((50, y + 10, "1 Introduction", 12))
     items.append((50, y + 28, "Earlier atlases (https://doi.org/10.1016/j.cell.2020.01.001) lacked spatial data.", 9))
     _page(doc, items)
@@ -57,7 +59,8 @@ def make_pdfs(d: Path) -> None:
                 (50, 78, "1. Smith, J. OtherTool. https://github.com/smithlab/othertool", 9),
                 (50, 92, "doi:10.1093/bioinformatics/btz001", 9)])
     doc.set_metadata({"title": "", "author": ""})
-    doc.save(d / "doe2024_zebrafish.pdf"); doc.close()
+    doc.save(d / "doe2024_zebrafish.pdf")
+    doc.close()
 
     # B — arXiv preprint: ID only in the rotated left-margin stamp.
     doc = pymupdf.open()
@@ -67,9 +70,11 @@ def make_pdfs(d: Path) -> None:
              (80, 180, "Abstract", 12)]
     y = 198
     for line in _para(LOREM, 80):
-        items.append((80, y, line, 9)); y += 12
+        items.append((80, y, line, 9))
+        y += 12
     _page(doc, items)
-    doc.save(d / "2401.01234v2.pdf"); doc.close()
+    doc.save(d / "2401.01234v2.pdf")
+    doc.close()
 
     # C — no identifier anywhere → title search.
     doc = pymupdf.open()
@@ -78,7 +83,8 @@ def make_pdfs(d: Path) -> None:
                 (50, 160, "Anna Jansen and Bram de Vries", 11),
                 (50, 200, "Plants deploy condensates to tune defence gene expression.", 9)])
     doc.set_metadata({"author": "Anna Jansen; Bram de Vries"})
-    doc.save(d / "scan_0042.pdf"); doc.close()
+    doc.save(d / "scan_0042.pdf")
+    doc.close()
 
     # D — bioRxiv preprint, DOI with version suffix in header.
     doc = pymupdf.open()
@@ -87,13 +93,15 @@ def make_pdfs(d: Path) -> None:
                 (50, 140, "Sofia Rossi, Mark de Jong", 11),
                 (50, 180, "Abstract", 12),
                 (50, 198, "Short abstract text that is too short for the PDF abstract fallback.", 9)])
-    doc.save(d / "rossi_biorxiv.pdf"); doc.close()
+    doc.save(d / "rossi_biorxiv.pdf")
+    doc.close()
 
     # E — nothing resolvable.
     doc = pymupdf.open()
     _page(doc, [(50, 100, "Internal lab protocol: buffer preparation notes", 16),
                 (50, 140, "Version 3, unpublished", 10)])
-    doc.save(d / "protocol.pdf"); doc.close()
+    doc.save(d / "protocol.pdf")
+    doc.close()
 
 
 # --------------------------------------------------------------------------- API fixtures
@@ -149,7 +157,8 @@ CR_B_PUB = {"message": {
     "container-title": ["Bioinformatics"], "published-online": {"date-parts": [[2024, 5, 10]]},
     "volume": "40", "issue": "5", "article-number": "btae100", "publisher": "Oxford University Press",
 }}
-OA_B_PUB = {"doi": "https://doi.org/10.1093/bioinformatics/btae100", "open_access": {"is_oa": True, "oa_status": "gold", "oa_url": "https://academic.oup.com/x.pdf"},
+OA_B_PUB = {"doi": "https://doi.org/10.1093/bioinformatics/btae100",
+            "open_access": {"is_oa": True, "oa_status": "gold", "oa_url": "https://academic.oup.com/x.pdf"},
             "best_oa_location": {"license": "cc-by", "version": "publishedVersion"}}
 
 CR_SEARCH_C = {"message": {"items": [
@@ -160,7 +169,8 @@ CR_SEARCH_C = {"message": {"items": [
      "author": [{"given": "Anna", "family": "Jansen"}, {"given": "Bram", "family": "de Vries"}],
      "container-title": ["The Plant Cell"], "published-print": {"date-parts": [[2023, 11]]},
      "volume": "35", "issue": "11", "page": "4001-4019"}]}}
-OA_C = {"doi": "https://doi.org/10.1105/tpc.23.00001", "open_access": {"is_oa": False, "oa_status": "closed", "oa_url": None}, "best_oa_location": None}
+OA_C = {"doi": "https://doi.org/10.1105/tpc.23.00001",
+        "open_access": {"is_oa": False, "oa_status": "closed", "oa_url": None}, "best_oa_location": None}
 
 CR_D = {"message": {
     "DOI": "10.1101/2024.03.15.585123", "type": "posted-content", "subtype": "preprint",

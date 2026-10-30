@@ -17,6 +17,7 @@ dependencies = [
 [project.optional-dependencies]
 dev = [
     "pytest>=7.4.0",
+    "ruff>=0.6",
 ]
 
 [project.scripts]
@@ -33,3 +34,10 @@ packages = ["pdfbatch"]
 minversion = "7.4"
 testpaths = ["tests"]
 addopts = "-ra"
+
+[tool.ruff]
+line-length = 130
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "B"]
+ignore = ["E731"]

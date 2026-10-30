@@ -16,6 +16,7 @@ from __future__ import annotations
 import json
 import os
 import re
+import threading
 from typing import Optional
 
 import requests
@@ -65,22 +66,31 @@ class LlmIdentifier:
         self.tokens_out = 0
         self.calls = 0
         self.failures = 0
+        self._lock = threading.Lock()         # worker threads share one identifier and its counters
 
     def identify(self, page1_text: str) -> Optional[dict]:
         """A search key, or None. A failed call (network, a reply that is not the expected
         JSON) costs this PDF its last tier, never the PDF-derived fields it already has."""
         ask = {"anthropic": self._anthropic, "ollama": self._ollama}[self.backend]
-        self.calls += 1
+        with self._lock:
+            self.calls += 1
         try:
             return ask(page1_text[:MAX_CHARS])
         except (requests.RequestException, ValueError, KeyError):
-            self.failures += 1
+            with self._lock:
+                self.failures += 1
             return None
+
+    def _count(self, tokens_in: int, tokens_out: int) -> None:
+        with self._lock:
+            self.tokens_in += tokens_in
+            self.tokens_out += tokens_out
 
     def _anthropic(self, text: str) -> Optional[dict]:
         r = requests.post(
             "https://api.anthropic.com/v1/messages",
-            headers={"x-api-key": os.environ["ANTHROPIC_API_KEY"], "anthropic-version": "2023-06-01", "content-type": "application/json"},
+            headers={"x-api-key": os.environ["ANTHROPIC_API_KEY"], "anthropic-version": "2023-06-01",
+                     "content-type": "application/json"},
             json={
                 "model": self.model or "claude-haiku-4-5",
                 "max_tokens": 200,
@@ -92,8 +102,7 @@ class LlmIdentifier:
         r.raise_for_status()
         body = r.json()
         usage = body.get("usage") or {}
-        self.tokens_in += usage.get("input_tokens", 0)
-        self.tokens_out += usage.get("output_tokens", 0)
+        self._count(usage.get("input_tokens", 0), usage.get("output_tokens", 0))
         return _parse("".join(b.get("text", "") for b in body.get("content", [])))
 
     def _ollama(self, text: str) -> Optional[dict]:
@@ -111,6 +120,5 @@ class LlmIdentifier:
         )
         r.raise_for_status()
         body = r.json()
-        self.tokens_in += body.get("prompt_eval_count", 0)
-        self.tokens_out += body.get("eval_count", 0)
+        self._count(body.get("prompt_eval_count", 0), body.get("eval_count", 0))
         return _parse((body.get("message") or {}).get("content", ""))

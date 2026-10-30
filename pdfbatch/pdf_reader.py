@@ -51,8 +51,8 @@ class PdfContent:
         """The first two substantial lines of page 1, joined: in reading order the title usually
         comes first. A last-resort search query for when font sizes mislead, as they do in OCR
         output, where sizes are estimated from the scanned glyphs."""
-        lines = [" ".join(l.split()) for l in (self.page_texts[0] if self.page_texts else "").splitlines()]
-        return " ".join([l for l in lines if len(l) >= 15][:2]) or None
+        lines = [" ".join(line.split()) for line in (self.page_texts[0] if self.page_texts else "").splitlines()]
+        return " ".join([line for line in lines if len(line) >= 15][:2]) or None
 
     @cached_property
     def words(self) -> frozenset:
@@ -88,7 +88,8 @@ def sha256_file(path: Path) -> str:
     return h.hexdigest()
 
 
-def read_pdf(path: Path) -> PdfContent:
+def read_pdf(path: Path, sha256: Optional[str] = None) -> PdfContent:
+    """`sha256`: the file's hash when the caller already has it (the CLI hashes every PDF)."""
     doc = pymupdf.open(path)
     try:
         info = {k: v for k, v in (doc.metadata or {}).items() if v}
@@ -110,7 +111,7 @@ def read_pdf(path: Path) -> PdfContent:
                 if (u := ln.get("uri") or "").startswith(("http://", "https://"))]
         return PdfContent(
             path=path,
-            sha256=sha256_file(path),
+            sha256=sha256 or sha256_file(path),
             info=info,
             xmp=xmp,
             page_texts=page_texts,
@@ -193,7 +194,7 @@ def _title_guesses(tp, rect) -> List[str]:
     tries each in turn; validation rejects the wrong ones.
     """
     lines = []                                 # (size, y, text) for lines in the top 60% of the page
-    for line in (l for b in tp.extractDICT().get("blocks", []) for l in b.get("lines", [])):
+    for line in (ln for b in tp.extractDICT().get("blocks", []) for ln in b.get("lines", [])):
         spans = [s for s in line["spans"] if s["text"].strip()]
         if spans and line["bbox"][1] <= rect.y0 + rect.height * 0.6:
             size = max(s["size"] for s in spans)
@@ -204,7 +205,7 @@ def _title_guesses(tp, rect) -> List[str]:
     guesses = []
     for size in sorted({s for s, _, _ in lines}, reverse=True)[:3]:
         run = []                               # the first vertically contiguous run at this size
-        for _, y, t in sorted((l for l in lines if abs(l[0] - size) < 0.6), key=lambda l: l[1]):
+        for _, y, t in sorted((ln for ln in lines if abs(ln[0] - size) < 0.6), key=lambda ln: ln[1]):
             if run and y - run[-1][0] > size * 2.2:
                 break
             run.append((y, t))

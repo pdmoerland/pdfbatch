@@ -114,7 +114,7 @@ class Record:
     def from_dict(cls, d: dict) -> "Record":
         d = dict(d)
         d["authors"] = [Author(**a) for a in d.get("authors") or []]
-        d["links"] = [Link(**l) for l in d.get("links") or []]
+        d["links"] = [Link(**link) for link in d.get("links") or []]
         d["oa"] = OpenAccess(**(d.get("oa") or {}))
         known = cls.__dataclass_fields__.keys()
         return cls(**{k: v for k, v in d.items() if k in known})
