@@ -52,8 +52,12 @@ def _arguments(argv) -> argparse.Namespace:
     ap.add_argument("--force", action="store_true", help="re-process PDFs already in the JSON file")
     ap.add_argument("--retry-unresolved", action="store_true",
                     help="re-process PDFs left unresolved last time, e.g. after adding --grobid, --llm or Tesseract")
-    ap.add_argument("--cache-dir", type=Path, default=Path(".pdfbatch_cache"))
+    ap.add_argument("--cache-dir", type=Path,
+                    help="HTTP and link-check cache (default: env PDFBATCH_CACHE_DIR, else the per-user "
+                         r"cache folder: %%LOCALAPPDATA%%\pdfbatch\Cache, ~/Library/Caches/pdfbatch "
+                         "or ~/.cache/pdfbatch)")
     args = ap.parse_args(argv)
+    args.cache_dir = args.cache_dir or apis.default_cache_dir()
     if not args.mailto:
         ap.error("--mailto (or CONTACT_MAILTO) is required by the CrossRef/OpenAlex polite pools")
     return args

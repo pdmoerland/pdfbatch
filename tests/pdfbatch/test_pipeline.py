@@ -618,3 +618,23 @@ def test_retry_after_is_capped(monkeypatch):
     monkeypatch.setattr(apis.time, "sleep", sleeps.append)
     assert h.get("https://api.example.org/x") == {"ok": True}
     assert sleeps and max(sleeps) <= apis.MAX_RETRY_AFTER == 60
+
+
+def test_api_key_not_in_cache_key(tmp_path, monkeypatch):
+    sent = []
+    h = apis.Http("t@example.org", cache_dir=tmp_path)
+    monkeypatch.setattr(h.session, "get", lambda url, params=None, **k: sent.append(params) or _Response(200, {"ok": 1}))
+    for _ in range(2):
+        assert h.get("https://api.example.org/x", params={"api_key": "SECRET", "q": "x"}) == {"ok": 1}
+    assert sent == [{"api_key": "SECRET", "q": "x"}]          # sent once, then served from the cache
+    assert not any("SECRET" in key for key in h.cache.iterkeys())
+    h.cache.close()
+
+
+def test_default_cache_dir(tmp_path, monkeypatch):
+    monkeypatch.setenv("PDFBATCH_CACHE_DIR", str(tmp_path / "mine"))
+    assert apis.default_cache_dir() == tmp_path / "mine"
+    monkeypatch.delenv("PDFBATCH_CACHE_DIR")
+    monkeypatch.setattr(apis.sys, "platform", "linux")
+    monkeypatch.setenv("XDG_CACHE_HOME", str(tmp_path / "xdg"))
+    assert apis.default_cache_dir() == tmp_path / "xdg" / "pdfbatch"

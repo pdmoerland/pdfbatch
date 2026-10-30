@@ -224,11 +224,12 @@ def main(argv=None) -> int:
         p.add_argument("--llm-model")
         p.add_argument("--ollama-url")
         p.add_argument("--workers", type=int, default=4)
-        p.add_argument("--cache-dir", type=Path, default=Path(".pdfbatch_cache"))
+        p.add_argument("--cache-dir", type=Path, help="default: the CLI's (env PDFBATCH_CACHE_DIR or the per-user cache)")
         if name == "run":
             p.add_argument("--compare", type=Path, metavar="RESULT.json", help="list PDFs whose outcome changed")
             p.add_argument("--max-wrong", type=int, metavar="N", help="exit 1 when more than N are wrong")
     args = ap.parse_args(argv)
+    args.cache_dir = args.cache_dir or apis.default_cache_dir()
     if not args.mailto:
         ap.error("--mailto (or CONTACT_MAILTO) is required by the CrossRef/OpenAlex polite pools")
     if not args.pdfs.is_dir():

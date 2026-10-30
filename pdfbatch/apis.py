@@ -10,7 +10,9 @@ Every function returns a dict whose keys are `Record` field names (plus
 from __future__ import annotations
 
 import html
+import os
 import re
+import sys
 import threading
 import time
 import urllib.parse
@@ -26,6 +28,18 @@ from .record import Author, OpenAccess
 
 _RETRY = {429, 500, 502, 503, 504}
 MAX_RETRY_AFTER = 60.0                 # seconds; a server's "Retry-After: 3600" must not stall a worker
+_UNCACHED_PARAMS = {"api_key"}          # sent, but never written to the cache file
+
+
+def default_cache_dir() -> Path:
+    """One per-user cache, wherever pdfbatch is run from, and outside synced project folders."""
+    if env := os.environ.get("PDFBATCH_CACHE_DIR"):
+        return Path(env)
+    if sys.platform == "win32":
+        return Path(os.environ.get("LOCALAPPDATA") or Path.home() / "AppData" / "Local") / "pdfbatch" / "Cache"
+    if sys.platform == "darwin":
+        return Path.home() / "Library" / "Caches" / "pdfbatch"
+    return Path(os.environ.get("XDG_CACHE_HOME") or Path.home() / ".cache") / "pdfbatch"
 
 
 def _retry_after(value: Optional[str], default: float) -> float:
@@ -65,7 +79,8 @@ class Http:
 
     def get(self, url: str, params: Optional[dict] = None, *, as_json: bool = True,
             min_interval: float = 0.12, retries: int = 3) -> Any:
-        key = url + "?" + urllib.parse.urlencode(sorted((params or {}).items()))
+        key = url + "?" + urllib.parse.urlencode(sorted((k, v) for k, v in (params or {}).items()
+                                                        if k not in _UNCACHED_PARAMS))
         if self.cache is not None:
             hit = self.cache.get(key)
             if hit is not None:
