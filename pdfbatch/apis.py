@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import html
 import re
+import threading
 import time
 import urllib.parse
 import xml.etree.ElementTree as ET
@@ -36,12 +37,20 @@ class Http:
         self.session.headers["User-Agent"] = f"pdfbatch/1.0 (mailto:{mailto})"
         self.cache = diskcache.Cache(str(cache_dir)) if cache_dir else None
         self._last: Dict[str, float] = {}
+        self._lock = threading.Lock()
 
     def _throttle(self, host: str, min_interval: float) -> None:
-        wait = self._last.get(host, 0) + min_interval - time.time()
+        """Wait for this host's next free slot.
+
+        The slot is reserved under the lock and slept for outside it: worker threads
+        each claim a distinct time, and a wait for one host does not hold up the others.
+        """
+        with self._lock:
+            slot = max(time.monotonic(), self._last.get(host, 0) + min_interval)
+            self._last[host] = slot
+        wait = slot - time.monotonic()
         if wait > 0:
             time.sleep(wait)
-        self._last[host] = time.time()
 
     def get(self, url: str, params: Optional[dict] = None, *, as_json: bool = True,
             min_interval: float = 0.12, retries: int = 3) -> Any:

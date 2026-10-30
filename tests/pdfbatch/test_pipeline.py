@@ -435,3 +435,27 @@ def test_notes_survive_reruns(pdf_dir, http, tmp_path, capsys):
     notes.write_text("", encoding="utf-8")                                    # deleting a note removes it
     assert run() == 0
     assert "Key reference" not in (out / "papers.md").read_text(encoding="utf-8")
+
+
+# --------------------------------------------------------------------------- robustness
+
+def test_throttle_spaces_concurrent_requests(monkeypatch):
+    # Worker threads share one Http; each must claim its own slot per host.
+    stamps = []
+
+    class Ok:
+        status_code, headers = 200, {}
+        def json(self):
+            return {}
+
+    def fake_get(url, params=None, timeout=None):
+        stamps.append(time.monotonic())
+        return Ok()
+
+    h = apis.Http("t@example.org", cache_dir=None)
+    monkeypatch.setattr(h.session, "get", fake_get)
+    with ThreadPoolExecutor(4) as ex:
+        list(ex.map(lambda i: h.get("https://api.example.org/x", {"i": i}, min_interval=0.05), range(8)))
+    stamps.sort()
+    assert len(stamps) == 8
+    assert min(b - a for a, b in zip(stamps, stamps[1:])) >= 0.045
