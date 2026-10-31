@@ -1,7 +1,7 @@
 ---
 title: Continuous integration on Linux, macOS and Windows
 type: feat
-status: in-progress
+status: completed
 date: 2026-10-30
 iteration: 18
 ---
@@ -36,14 +36,19 @@ From an external review: there is no CI, and several code paths are platform-spe
 - **Steps:** checkout; `astral-sh/setup-uv` with caching; `uv sync --locked --extra dev` (fails if `uv.lock` is stale); `uv run ruff check pdfbatch tests bench`; `uv run mypy`; `uv run pytest`.
 - **Offline:** the tests mock every API, so CI needs no secrets and no network beyond installing packages. The benchmark (real APIs) stays out of CI.
 - **Tesseract is not installed:** the OCR tests already fake it.
+- **Failures readable without a login:** GitHub shows job logs only to signed-in users, but annotations to anyone. The pytest step writes the failing tests and their error lines (or, after a crash, the last 30 lines of output) as one error annotation. GitHub runs bash steps with `-eo pipefail`, so the step catches pytest's status instead of stopping on it.
 
 ## Found on the way
 
 Running the suite on Python 3.11 locally (Windows) failed the throttle test about one run in three: before Python 3.13, `time.monotonic` on Windows ticks every 15.6 ms, so throttle slots could come up to 15 ms early. The throttle now uses `time.perf_counter`, high-resolution everywhere (`b20b234`); 0 failures in 15 runs.
 
+CI then failed the same test on macOS only, with two requests to one host 0.3 ms apart: a thread reserved a slot and slept outside the lock, and on a busy runner one that woke late went out together with the next. Each host now has its own lock, held while waiting, and the time is marked when a request actually goes out (`6602afe`). A new test makes one thread oversleep by 80 ms: it failed 3 of 3 before, passes 10 of 10 after.
+
+Finding it took three runs, because the failure was invisible without a login: the annotation step was added (`e1dcb2f`), made to cover crashes (`c182a00`), and made to survive GitHub's `bash -eo pipefail` (`4be6742`), whose `-e` had stopped the step before it could annotate.
+
 ## Result
 
-`81c672f` (mypy), `2884c6a` (platform tests), `b20b234` (throttle clock), `b721dc6` (workflow). Locally on Windows: 79 tests, Ruff and mypy pass on Python 3.11 and 3.13; output for 92 real PDFs is byte-identical.
+`81c672f` (mypy), `2884c6a` (platform tests), `b20b234` (throttle clock), `b721dc6` (workflow). Locally on Windows: 79 tests, Ruff and mypy pass on Python 3.11 and 3.13; output for 92 real PDFs is byte-identical. Then `e1dcb2f`, `c182a00`, `4be6742` (annotations, Node 24 actions) and `6602afe` (per-host throttle lock; 80 tests). [Run 41184758699](https://github.com/pdmoerland/pdfbatch/actions/runs/41184758699): all six jobs green.
 
 ## Done when
 
