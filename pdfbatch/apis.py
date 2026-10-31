@@ -62,23 +62,27 @@ class Http:
         self.session = requests.Session()
         self.session.headers["User-Agent"] = f"pdfbatch/{__version__} (mailto:{mailto})"
         self.cache = diskcache.Cache(str(cache_dir)) if cache_dir else None
-        self._last: dict[str, float] = {}
-        self._lock = threading.Lock()
+        self._last: dict[str, float] = {}           # per host: when its last request went out
+        self._hosts: dict[str, threading.Lock] = {}
+        self._lock = threading.Lock()                # guards _hosts
 
     def _throttle(self, host: str, min_interval: float) -> None:
-        """Wait for this host's next free slot.
+        """Wait until `min_interval` after this host's last request, and mark the time.
 
-        The slot is reserved under the lock and slept for outside it: worker threads
-        each claim a distinct time, and a wait for one host does not hold up the others.
-        `perf_counter`, not `monotonic`: before Python 3.13, Windows' monotonic clock
-        ticks every 15.6 ms, so slots could come up to 15 ms early.
+        One lock per host, held while waiting: a thread that wakes late (a busy machine)
+        pushes the next request back instead of going out together with it, and a wait
+        for one host does not hold up the others. Requests already sent stay in flight
+        in parallel. `perf_counter`, not `monotonic`: before Python 3.13, Windows'
+        monotonic clock ticks every 15.6 ms.
         """
         with self._lock:
-            slot = max(time.perf_counter(), self._last.get(host, 0) + min_interval)
-            self._last[host] = slot
-        wait = slot - time.perf_counter()
-        if wait > 0:
-            time.sleep(wait)
+            host_lock = self._hosts.setdefault(host, threading.Lock())
+        with host_lock:
+            if host in self._last:
+                wait = self._last[host] + min_interval - time.perf_counter()
+                if wait > 0:
+                    time.sleep(wait)
+            self._last[host] = time.perf_counter()
 
     def get(self, url: str, params: dict | None = None, *, as_json: bool = True,
             min_interval: float = 0.12, retries: int = 3) -> Any:

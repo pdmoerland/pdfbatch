@@ -565,6 +565,29 @@ def test_throttle_spaces_concurrent_requests(monkeypatch):
     assert min(b - a for a, b in pairwise(stamps)) >= 0.045
 
 
+def test_throttle_survives_a_late_wakeup(monkeypatch):
+    # On a busy machine a sleeping thread can wake late. Its request must then push the
+    # next one back, not go out together with it (seen on a macOS CI runner).
+    stamps, slept, real_sleep = [], [], time.sleep
+
+    class Ok:
+        status_code, headers = 200, {}
+        def json(self):
+            return {}
+
+    def oversleep_once(seconds):                   # the first thread that waits wakes 80 ms late
+        slept.append(seconds)
+        real_sleep(seconds + (0.08 if len(slept) == 1 else 0))
+
+    h = apis.Http("t@example.org", cache_dir=None)
+    monkeypatch.setattr(h.session, "get", lambda *a, **k: stamps.append(time.perf_counter()) or Ok())
+    monkeypatch.setattr(apis.time, "sleep", oversleep_once)
+    with ThreadPoolExecutor(4) as ex:
+        list(ex.map(lambda i: h.get("https://api.example.org/x", {"i": i}, min_interval=0.05), range(4)))
+    stamps.sort()
+    assert min(b - a for a, b in pairwise(stamps)) >= 0.045
+
+
 def _run_cli(src, tmp_path, *extra):
     return cli.main([str(src), "--out", str(tmp_path / "out"), "--mailto", "t@example.org",
                      "--cache-dir", str(tmp_path / "cache"), *extra])
