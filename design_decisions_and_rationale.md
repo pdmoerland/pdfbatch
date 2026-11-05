@@ -311,4 +311,4 @@ Principles applied in [iteration 4](docs/plans/2026-10-02-refactor-minimal-elega
 | 16 | [Unpaywall by default](docs/plans/2026-10-30-feat-unpaywall-by-default-plan.md) | `7d21633` |
 | 17 | [PyMuPDF lock, short-lived 404s, checked field names](docs/plans/2026-10-30-fix-threads-and-negative-cache-plan.md) | `4988a8a`, `3d47e14`, `d108b71` |
 | 18 | [CI on Linux, macOS and Windows](docs/plans/2026-10-30-feat-ci-plan.md) | `81c672f` … `6602afe` |
-| 19 | [Author lists at the end, and tools a paper only used](docs/plans/2026-11-05-fix-availability-sections-plan.md) | `8127639`, (pending) |
+| 19 | [Author lists at the end, and tools a paper only used](docs/plans/2026-11-05-fix-availability-sections-plan.md) | `8127639`, `dfe34f0` |

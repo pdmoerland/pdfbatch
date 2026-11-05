@@ -1,7 +1,7 @@
 ---
 title: Author lists at the end, and tools a paper only used
 type: fix
-status: in-progress
+status: completed
 date: 2026-11-05
 iteration: 19
 ---
@@ -17,7 +17,7 @@ All fixes come from one Nature Cancer paper (`s43018-024-00784-3.pdf`, "The prot
 | `8127639` | Unresolved, although its DOI is in the XMP: CrossRef's record failed validation. Page 1 only says "A list of authors and their affiliations appears at the end of the paper", so no author was found in the first three pages. | When page 1 says so, author names are looked for in the whole text. The title must still match the first pages. |
 | `8127639` | Code link `github.com/broa-dinstitute/ssGSEA2.0`: the typesetter's hyphen at a line break was kept. | A text URL with one hyphen too many gives way to the hyperlink annotation, as a cut-off prefix already did. |
 | `8127639` | PMCID shown as `11358022`. | OpenAlex's PMC URL ends in the bare number; the `PMC` prefix is added. |
-| (this iteration) | Code link `github.com/broadinstitute/ssGSEA2.0`, an existing tool the paper used. Its Code availability section says no new code was written. | See below. |
+| `dfe34f0` | Code link `github.com/broadinstitute/ssGSEA2.0`, an existing tool the paper used. Its Code availability section says no new code was written. | See below. |
 
 ## Why ssGSEA2.0 was taken as the paper's own
 
