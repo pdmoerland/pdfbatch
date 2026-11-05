@@ -241,17 +241,91 @@ _STATEMENT = re.compile(
     r"|\b(?:(?:downloaded|obtained|retrieved|taken|adapted) from|provided (?:at|by|in)|based on|implemented in)\b",
     re.I)
 _TAG_BEFORE = re.compile(rf"\b(?:{_TAG})\s*[:\-–]\s*<?$", re.I)
+# What the rest of the sentence says: the paper used the tool ("… was used to separate"),
+# unless it calls it its own ("Our code is available at … and was used to make the figures").
+_USED_AFTER = re.compile(r"\b(?:was|were|is|are|has been|have been)\s+(?:\w+\s+)?"
+                         r"(?:used|applied|employed|utili[sz]ed|adopted)\b", re.I)
+_OURS = re.compile(r"\b(?:our|we|this (?:study|work|paper|article|manuscript))\b", re.I)
+_SENTENCE_END = re.compile(r"[.!?]\s|\n\s*\n")
 
 
-def _claimed(text: str, i: int, window: int = 300) -> bool:
-    """The paper offers the link at `i` as its own: in the URL's own sentence, the statement
-    nearest to it says "available at" or "deposited at", not "downloaded from", or a tag
-    precedes it ("Code: https://…"). Tools a paper merely cites or compares, in tables or
-    in passing, make no such claim (Chen et al.'s table of benchmarked methods)."""
+def _sentence_around(text: str, i: int, window: int = 300) -> tuple[str, str]:
+    """The URL at `i`'s sentence: the part before the URL and the part after it."""
     before = text[max(0, i - window):i]
-    sentence = before[max((m.end() for m in re.finditer(r"[.!?]\s|\n\s*\n", before)), default=0):]
-    statements = list(_STATEMENT.finditer(sentence))
-    return bool(_TAG_BEFORE.search(sentence) or statements and statements[-1]["claim"])
+    before = before[max((m.end() for m in _SENTENCE_END.finditer(before)), default=0):]
+    after = text[i:i + window]
+    url = after.split(None, 1)[0].rstrip(".,;:!?)") if after.strip() else ""
+    after = after[len(url):]                                                     # skip the URL itself
+    end = _SENTENCE_END.search(after)
+    return before, after[:end.start() if end else len(after)]
+
+
+def _tagged(text: str, i: int) -> bool:
+    """A tag precedes the URL at `i`: "Code: https://…"."""
+    return bool(_TAG_BEFORE.search(_sentence_around(text, i)[0]))
+
+
+def _claimed(text: str, i: int, in_section: bool = False) -> bool:
+    """The paper offers the link at `i` as its own: in the URL's own sentence, the statement
+    nearest before it says "available at" or "deposited at", not "downloaded from", and
+    the rest of the sentence does not say it "was used"; or a tag precedes it ("Code:
+    https://…"). Tools a paper merely cites, compares or uses, in tables or in passing, make
+    no such claim (Chen et al.'s table of benchmarked methods; "The ssGSEA implementation
+    available on https://… was used"). In an availability section the section itself is
+    the offer: there only a statement of use rejects a link ("The ENCORE_AUTOMATION GitHub
+    repository contains the scripts … (https://…)" is the paper's own)."""
+    before, after = _sentence_around(text, i)
+    if _TAG_BEFORE.search(before):
+        return True
+    statements = list(_STATEMENT.finditer(before))
+    offered = bool(statements[-1]["claim"]) if statements else in_section
+    used = _USED_AFTER.search(after) and not _OURS.search(before + after)
+    return offered and not used
+
+
+# Availability sections: "Code availability", "Data and code availability", "Availability of
+# data and materials", "Availability and implementation:" (Bioinformatics). A section is a
+# heading at the start of a line, up to the next heading of its kind or of what follows it.
+_AVAIL_WORDS = r"(?:data|code|software|materials?|resources?|source|analysis|and|&|,)"
+_AVAIL_HEADING = re.compile(
+    rf"^[ \t]*(?:\d+(?:\.\d+)*\.?[ \t]*)?(?P<h>(?:{_AVAIL_WORDS}[ \t]+){{1,5}}availability"
+    rf"|availability[ \t]+(?:and[ \t]+implementation|of[ \t]+(?:{_AVAIL_WORDS}[ \t]*){{1,5}}))"
+    r"[ \t]*(?=[:.]|$)",
+    re.I | re.M)
+_NO_NEW_CODE = re.compile(
+    r"\bno (?:new |novel |custom |original |bespoke |specific |unique )*(?:code|software|algorithms?)\b"
+    r"|\b(?:code|software)\b[^.]{0,60}\bnot (?:been )?(?:generated|developed|written|created)\b"
+    r"|\bdid not (?:generate|develop|write|create) (?:any )?(?:new |novel |custom )*(?:code|software)\b",
+    re.I)
+_HAS_URL = re.compile(r"https?://|\bdoi\.org/|\b10\.\d{4,9}/", re.I)
+
+
+@dataclass(frozen=True)
+class _Section:
+    start: int
+    end: int
+    kinds: frozenset[str]                      # 'code', 'data'
+    binding: frozenset[str]                    # the kinds it speaks for: it has a URL, or denies new code
+
+
+def _sections(text: str) -> list[_Section]:
+    """The paper's availability sections."""
+    out = []
+    for m in _AVAIL_HEADING.finditer(text):
+        h = m["h"].lower()
+        kinds = frozenset(k for k, rx in (("code", r"code|software|implementation|resource|analysis|source"),
+                                          ("data", r"data|material|resource"))
+                          if re.search(rx, h))
+        if not kinds:
+            continue
+        nxt = _SECTION_END.search(text, m.end())
+        end = min(nxt.start() if nxt else len(text), m.end() + 2500)
+        body = text[m.end():end]
+        binding = kinds if _HAS_URL.search(body) else frozenset()
+        if "code" in kinds and _NO_NEW_CODE.search(body):
+            binding |= {"code"}
+        out.append(_Section(m.start(), end, kinds, frozenset(binding)))
+    return out
 
 
 _AFTER_REFS = re.compile(
@@ -261,6 +335,13 @@ _AFTER_REFS = re.compile(
     r"key resources table|star\s*methods)\b",
     re.I | re.M,
 )
+# Where an availability section ends: the next heading.
+_SECTION_END = re.compile(
+    rf"{_AFTER_REFS.pattern}|{_AVAIL_HEADING.pattern}"
+    r"|^\s*(?:\d+\.?\s*)?(?:introduction|background|results|discussion|conclusions?|contact)\b"
+    r"|^\s*(?:references|bibliography|funding|declarations|ethics.{0,40}|abbreviations|"
+    r"conflicts? of interest|additional information|orcid)\s*:?\s*$",
+    re.I | re.M)
 
 
 def _remnant(text_url: str, hyperlink: str) -> bool:
@@ -292,10 +373,29 @@ def find_links(pdf: PdfContent, checker: LinkChecker | None = None) -> list[Link
         if where.get(f.url, -1) < 0:
             where[f.url] = next((where[g.url] for g in in_text if _remnant(g.url, f.url)), -1)
 
+    # A paper with an availability section that speaks for a kind of link (it gives a URL,
+    # or says no new code was written) offers its own links of that kind there, or tagged
+    # ("Code: https://…"); a URL of that kind elsewhere is a tool or dataset it used.
+    # The URL may come first in Methods and again in a section: every mention in a section is
+    # judged, as offered by the section itself.
+    sections = _sections(text)
+    binding = frozenset().union(*(s.binding for s in sections))
+    lower = text.lower()
+
+    def in_sections(f: Found) -> list[int]:
+        """Where the link is mentioned in an availability section."""
+        needles = {u.split("://", 1)[-1].lower() for u in (f.original, f.url)}
+        return [m.start() for s in sections for n in needles
+                for m in re.compile(re.escape(n)).finditer(lower, s.start, s.end)]
+
+    def stated(f: Found, i: int) -> bool:
+        if (i >= 0 and (f.kind not in binding or _tagged(text, i))
+                and not any(a <= i < b for a, b in refs) and _claimed(text, i)):
+            return True
+        return any(_claimed(text, j, in_section=True) for j in in_sections(f))
+
     def own(f: Found) -> bool:
-        i = where[f.url]
-        cited = any(a <= i < b for a, b in refs)                  # in the reference list
-        return (i >= 0 and not cited and _claimed(text, i) and f.url.lower() not in BLOCKLIST
+        return (stated(f, where[f.url]) and f.url.lower() not in BLOCKLIST
                 and (checker is None or checker.alive(f)))
 
     in_text = [f for f in in_text if f.url in hyperlinks or not any(_remnant(f.url, u) for u in hyperlinks)]

@@ -450,10 +450,48 @@ def test_url_cut_by_a_line_number():
 
 def test_url_hyphenated_at_a_line_break():
     # The typesetter's hyphen stays in the text; the hyperlink annotation is without it.
-    text = "The ssGSEA implementation available on https://github.com/broa-\ndinstitute/ssGSEA2.0 was used."
+    text = "Our ssGSEA implementation is available on https://github.com/broa-\ndinstitute/ssGSEA2.0."
     assert _links_in(text, ["https://github.com/broadinstitute/ssGSEA2.0"]) == ["https://github.com/broadinstitute/ssGSEA2.0"]
     # A real hyphen at a line break, with no hyperlink to say otherwise, is kept.
     assert _links_in("Code is available at https://github.com/gao-\nlab/GLUE.") == ["https://github.com/gao-lab/GLUE"]
+
+
+def test_a_tool_the_paper_used_is_not_its_own():
+    # "available" before the URL, "was used" after it: someone else's tool.
+    used = "The ssGSEA implementation available on https://github.com/broadinstitute/ssGSEA2.0 was used to score samples."
+    assert _links_in(used) == []
+    # Unless the sentence says it is the paper's own.
+    ours = "Our code is available at https://github.com/gao-lab/GLUE and was used to make all figures."
+    assert _links_in(ours) == ["https://github.com/gao-lab/GLUE"]
+
+
+def test_an_availability_section_speaks_for_the_paper():
+    methods = ("Methods\nThe ssGSEA implementation available on https://github.com/broadinstitute/ssGSEA2.0 "
+               "scored the samples. Reads were aligned with STAR (available at https://github.com/alexdobin/STAR).\n")
+    # A Nature paper that wrote no code of its own.
+    nature = methods + ("Code availability\nAll used R packages are public and are freely available online. "
+                        "No new code or mathematical algorithms were generated from this manuscript.\nReferences\n")
+    assert _links_in(nature) == []
+    # A section with a URL: links of that kind count there only, wherever they come first.
+    with_url = methods + ("Code availability\nThe code is available at https://github.com/lab/own and "
+                          "https://github.com/alexdobin/STAR.\nReferences\n")
+    assert _links_in(with_url) == ["https://github.com/alexdobin/STAR", "https://github.com/lab/own"]
+    # In the section, the section itself is the offer; only a statement of use rejects a link.
+    contains = methods + ("Code availability\nThe scripts referred to are at https://github.com/lab/own. The "
+                          "aligner (https://github.com/alexdobin/STAR) was used as is.\nReferences\n")
+    assert _links_in(contains) == ["https://github.com/lab/own"]
+    # Data links are not bound by a code section.
+    data = "Data are deposited in Zenodo at https://doi.org/10.5281/zenodo.7857017.\n"
+    assert _links_in(data + with_url) == ["https://doi.org/10.5281/zenodo.7857017", "https://github.com/alexdobin/STAR",
+                                          "https://github.com/lab/own"]
+    # A section without a URL that does not deny new code changes nothing: the code may be in Methods.
+    on_request = ("Methods\nOur pipeline is available at https://github.com/lab/pipe.\n"
+                  "Code availability\nCode is available from the authors on reasonable request.\n")
+    assert _links_in(on_request) == ["https://github.com/lab/pipe"]
+    # A tag still counts anywhere: "Availability and implementation:" in a Bioinformatics abstract
+    # is a section itself, and "Code:" a tag.
+    abstract = "Availability and implementation: Code: https://github.com/lab/tool\nIntroduction\nText."
+    assert _links_in(abstract + "\n" + nature) == ["https://github.com/lab/tool"]
 
 
 def _links_in(text, uris=()):
