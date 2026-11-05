@@ -571,6 +571,9 @@ def test_ris_and_markdown(pdf_dir, http, tmp_path):
     assert "**Open access:** hybrid" in text and "🟠" not in text
     assert "Abstract" not in text
     assert "*Nature Methods*, *21*(6), 1012–1024." in text
+    assert "PMID [38400001](https://pubmed.ncbi.nlm.nih.gov/38400001/)" in text
+    assert "[PMC1100001](https://pmc.ncbi.nlm.nih.gov/articles/PMC1100001/)" in text
+    assert "[arXiv:2401.01234](https://arxiv.org/abs/2401.01234)" in text
 
 
 # --------------------------------------------------------------------------- your notes

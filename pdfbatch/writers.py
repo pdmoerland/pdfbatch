@@ -200,7 +200,10 @@ def _md_entry(r: Record) -> list[str]:
         out += ["**Notes:**", "", r.user_notes, ""]
     if r.doi:
         out.append(f"**DOI:** [{r.doi}](https://doi.org/{r.doi})  ")
-    ids = [x for x in (r.arxiv_id and f"arXiv:{r.arxiv_id}", r.pmid and f"PMID {r.pmid}", r.pmcid) if x]
+    pmcid = r.pmcid and ("" if r.pmcid.upper().startswith("PMC") else "PMC") + r.pmcid   # bare in older JSON
+    ids = [x for x in (r.arxiv_id and f"[arXiv:{r.arxiv_id}](https://arxiv.org/abs/{r.arxiv_id})",
+                       r.pmid and f"PMID [{r.pmid}](https://pubmed.ncbi.nlm.nih.gov/{r.pmid}/)",
+                       pmcid and f"[{pmcid}](https://pmc.ncbi.nlm.nih.gov/articles/{pmcid}/)") if x]
     if ids:
         out.append(f"**Other IDs:** {', '.join(ids)}  ")
     details = _oa_details(r)
