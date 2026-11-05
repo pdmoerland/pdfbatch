@@ -56,13 +56,24 @@ class PdfContent:
 
     @cached_property
     def words(self) -> frozenset:
-        """The distinct words of `head`, without digits ("segal1" → "segal")."""
-        return frozenset(re.findall(r"[a-z]+", self.head))
+        """The distinct words of `byline`, without digits ("segal1" → "segal")."""
+        return frozenset(re.findall(r"[a-z]+", self.byline))
 
     @cached_property
     def head(self) -> str:
         """First three pages plus the Info title, normalised for fuzzy matching."""
         return normalize("\n".join(self.page_texts[:3]) + " " + str(self.info.get("title", "")))
+
+    @cached_property
+    def byline(self) -> str:
+        """Where the authors' names are: `head`, or the whole text when page 1 says the
+        author list is at the end, as Nature journals do for long author lists."""
+        return normalize(self.full_text) if _AUTHORS_AT_END.search(self.head) else self.head
+
+
+# "A list of authors and their affiliations appears at the end of the paper" (Nature),
+# matched in normalised text.
+_AUTHORS_AT_END = re.compile(r"\blist of (?:\w+ ){0,3}authors\b(?: \w+){0,12} end of the (?:paper|article|manuscript)\b")
 
 
 def normalize(s: str | None) -> str:

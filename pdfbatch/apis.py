@@ -306,7 +306,9 @@ def openalex_to_fields(w: dict) -> dict:
     best = w.get("best_oa_location") or {}
     ids = w.get("ids") or {}
     pmid = (ids.get("pmid") or "").rsplit("/", 1)[-1] or None
-    pmcid = (ids.get("pmcid") or "").rsplit("/", 1)[-1] or None
+    pmcid = (ids.get("pmcid") or "").rstrip("/").rsplit("/", 1)[-1] or None
+    if pmcid and pmcid.isdigit():              # OpenAlex: ".../pmc/articles/11358022"
+        pmcid = f"PMC{pmcid}"
     date = w.get("publication_date")
     doi = (w.get("doi") or "").replace("https://doi.org/", "").lower() or None
     return {

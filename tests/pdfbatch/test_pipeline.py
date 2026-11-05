@@ -399,6 +399,22 @@ def test_authors_with_affiliation_numbers():
     assert validate(f, pdf)[0] == "high"
 
 
+def test_author_list_at_the_end_of_the_paper():
+    # Nature journals move long author lists to the end; page 1 only says so.
+    title = "The proteogenomic landscape of multiple myeloma reveals insights into disease biology"
+    page1 = f"{title}\nAbstract text.\nA list of authors and their affiliations appears at the end of the paper"
+    pages = [page1, "Results.", "Methods.", "References.", "Evelyn Ramberger 1,2, Valeriia Sapozhnikova1"]
+    f = {"title": title, "authors": [Author("Ramberger", "Evelyn")]}
+    pdf = PdfContent(path=Path("x.pdf"), sha256="", info={}, xmp="", page_texts=pages,
+                     header_footer_text="", title_guesses=[])
+    assert validate(f, pdf)[0] == "high"
+    # Without that notice, names far from the first pages do not count.
+    pages[0] = f"{title}\nAbstract text."
+    pdf = PdfContent(path=Path("x.pdf"), sha256="", info={}, xmp="", page_texts=pages,
+                     header_footer_text="", title_guesses=[])
+    assert validate(f, pdf)[0] == "low"
+
+
 def test_a_title_alone_confirms_nothing():
     # Slides titled like a textbook chapter: a perfect title without the authors is no match.
     pdf = _pdf_with_text("Model Assessment\nand\nSelection\nAxel Benner\nBiostatistics, German Cancer Research Center")
@@ -430,6 +446,14 @@ def test_url_cut_by_a_line_number():
                      page_texts=["The source code is available at https://github.com/DBinary/STARN\n1472\net."],
                      link_uris=["https://github.com/DBinary/STARNet"])
     assert [link.url for link in find_links(pdf)] == ["https://github.com/DBinary/STARNet"]
+
+
+def test_url_hyphenated_at_a_line_break():
+    # The typesetter's hyphen stays in the text; the hyperlink annotation is without it.
+    text = "The ssGSEA implementation available on https://github.com/broa-\ndinstitute/ssGSEA2.0 was used."
+    assert _links_in(text, ["https://github.com/broadinstitute/ssGSEA2.0"]) == ["https://github.com/broadinstitute/ssGSEA2.0"]
+    # A real hyphen at a line break, with no hyperlink to say otherwise, is kept.
+    assert _links_in("Code is available at https://github.com/gao-\nlab/GLUE.") == ["https://github.com/gao-lab/GLUE"]
 
 
 def _links_in(text, uris=()):
@@ -874,3 +898,11 @@ def test_ollama_unreachable_counts_a_failure(monkeypatch):
     ident = llm.LlmIdentifier("ollama")
     assert ident.identify("page text") is None
     assert (ident.calls, ident.failures) == (1, 1)
+
+
+def test_openalex_pmcid_keeps_its_prefix():
+    # OpenAlex's PMC URL ends in the bare number; a PMCID is "PMC" + digits.
+    ids = {"pmid": "https://pubmed.ncbi.nlm.nih.gov/38942927",
+           "pmcid": "https://www.ncbi.nlm.nih.gov/pmc/articles/11358022"}
+    f = apis.openalex_to_fields({"ids": ids})
+    assert (f["pmid"], f["pmcid"]) == ("38942927", "PMC11358022")

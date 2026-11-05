@@ -72,7 +72,7 @@ def _name_in(pdf: PdfContent, name: str) -> bool:
     word. Shorter names must match exactly: one edit away, "Chen" is "then" and a
     reviewer called "States" is "stages".
     """
-    if re.search(rf"(?<![a-z]){re.escape(name)}(?![a-z])", pdf.head):
+    if re.search(rf"(?<![a-z]){re.escape(name)}(?![a-z])", pdf.byline):
         return True
     return all(process.extractOne(w, pdf.words, scorer=Levenshtein.distance,
                                   score_cutoff=0 if len(w) < 8 else 1 if len(w) < 12 else 2) is not None

@@ -263,6 +263,13 @@ _AFTER_REFS = re.compile(
 )
 
 
+def _remnant(text_url: str, hyperlink: str) -> bool:
+    """`text_url` is what a line break left of `hyperlink`: a prefix of it, or it with one
+    hyphen too many."""
+    return any(hyperlink.startswith(u) for u in
+               [text_url, *(text_url[:i] + text_url[i + 1:] for i, c in enumerate(text_url) if c == "-")])
+
+
 def find_links(pdf: PdfContent, checker: LinkChecker | None = None) -> list[Link]:
     # Drop zero-width spaces, which some publishers put inside printed URLs as break points
     # ("https://​zenodo.​org/…"), and re-join URLs broken at line ends: after / - _
@@ -274,15 +281,16 @@ def find_links(pdf: PdfContent, checker: LinkChecker | None = None) -> list[Link
             for m in REFS_HEADING_RE.finditer(text)]
 
     # A URL broken across lines (in preprints, around a margin line number) leaves a prefix of
-    # the hyperlink behind it in the text: ".../STARN" for ".../STARNet". The link annotation
-    # is the authoritative form; a text URL that only prefixes an annotated one is dropped,
+    # the hyperlink behind it in the text: ".../STARN" for ".../STARNet", or keeps the
+    # typesetter's hyphen: "github.com/broa-⏎dinstitute". The link annotation is the
+    # authoritative form; a text URL that is such a remnant of an annotated one is dropped,
     # but its place in the text still locates the hyperlink.
     in_text, annotated = extract(text), extract("\n".join(pdf.link_uris))
     hyperlinks = {f.url for f in annotated}
     where = {f.url: _position(text, f) for f in in_text}
     for f in annotated:
         if where.get(f.url, -1) < 0:
-            where[f.url] = next((where[g.url] for g in in_text if f.url.startswith(g.url)), -1)
+            where[f.url] = next((where[g.url] for g in in_text if _remnant(g.url, f.url)), -1)
 
     def own(f: Found) -> bool:
         i = where[f.url]
@@ -290,7 +298,7 @@ def find_links(pdf: PdfContent, checker: LinkChecker | None = None) -> list[Link
         return (i >= 0 and not cited and _claimed(text, i) and f.url.lower() not in BLOCKLIST
                 and (checker is None or checker.alive(f)))
 
-    in_text = [f for f in in_text if f.url in hyperlinks or not any(u.startswith(f.url) for u in hyperlinks)]
+    in_text = [f for f in in_text if f.url in hyperlinks or not any(_remnant(f.url, u) for u in hyperlinks)]
     found = [f for f in _first_per_url(in_text + annotated) if own(f)]
     label = labels(text, found)
     seen: Counter[str] = Counter()
